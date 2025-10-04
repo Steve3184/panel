@@ -1,0 +1,29 @@
+{
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@felipecrs/decompress-tarxz": "^5.0.4",
+    "@xhmikosr/decompress-tar": "^8.1.0",
+    "@xhmikosr/decompress-tarbz2": "^8.1.0",
+    "@xhmikosr/decompress-targz": "^8.1.0",
+    "7zip-bin": "github:develar/7zip-bin",
+    "archiver": "^7.0.1",
+    "axios": "^1.12.2",
+    "bcrypt": "^5.1.1",
+    "busboy": "^1.6.0",
+    "decompress": "^4.2.1",
+    "dockerode": "^4.0.7",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "express-ws": "^5.0.2",
+    "fs-extra": "^11.2.0",
+    "node-7z": "^3.0.0",
+    "node-pty": "^1.0.0",
+    "os-utils": "^0.0.14",
+    "pidusage": "^3.0.2",
+    "ps-tree": "^1.2.0",
+    "uuid": "^9.0.1"
+  }
+}

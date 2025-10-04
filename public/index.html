@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="panel.title">仪表盘</title>
+    <link href="/cdn/z4/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/cdn/z4/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/cdn/z4/xterm/5.4.0/xterm.min.css" />
+    <link rel="stylesheet" href="/cdn/jsdelivr/monaco-editor@0.41.0/min/vs/editor/editor.main.css" />
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+
+    <div class="d-flex">
+        <!-- 左侧菜单栏 -->
+        <nav class="sidebar p-3">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0"><i class="bi bi-server me-2"></i><span data-i18n="panel.name">面板</span></h4>
+                <button class="btn btn-dark d-block d-md-none" id="sidebar-close-btn"><i
+                        class="bi bi-x-lg"></i></button>
+            </div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#" id="overview-link"><i class="bi bi-grid-1x2-fill me-2"></i><span
+                            data-i18n="title.overview">概览</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" id="file-manager-link"><i class="bi bi-folder-fill me-2"></i><span
+                            data-i18n="title.files">文件管理</span></a>
+                </li>
+                <!-- 用户管理 (仅管理员可见) -->
+                <li class="nav-item d-none" id="admin-users-link-container">
+                    <a class="nav-link" href="#" id="admin-users-link"><i class="bi bi-people-fill me-2"></i><span
+                            data-i18n="title.users">用户管理</span></a>
+                </li>
+            </ul>
+            <hr>
+            <h6 class="px-3" data-i18n="title.instances">实例</h6>
+            <ul class="nav flex-column mb-2" id="instance-list-sidebar"></ul>
+        </nav>
+
+        <!-- 右侧主内容区 -->
+        <main id="main-content">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-dark me-2" id="sidebar-toggle-btn"><i class="bi bi-list"></i></button>
+                    <h1 class="h2 mb-0" id="page-title"></h1> <!-- For overview page -->
+                </div>
+                <div class="dropdown" id="user-info-dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                        id="user-dropdown-menu-button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span data-i18n="panel.welcome">欢迎, </span><span id="username-display"></span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="user-dropdown-menu-button">
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+                                data-bs-target="#changePasswordModal" id="change-password-dropdown-item"
+                                data-i18n="users.change_password">修改密码</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+                                data-bs-target="#changeLanguageModal" id="change-language-dropdown-item">
+                                <span data-i18n="panel.change_language">修改语言</span>
+                            </a></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li><a class="dropdown-item" href="#" id="logout-btn" data-i18n="panel.logout">登出</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 概览页面 (内容由JS动态生成) -->
+            <div id="overview-page"></div>
+
+            <!-- 实例/终端页面 -->
+            <div id="instance-page" class="d-none">
+                <div class="d-flex justify-content-between align-items-center pb-2 mb-3 border-bottom flex-wrap">
+                    <div class="d-flex align-items-center me-3 mb-2 mb-md-0">
+                        <h1 class="h2 me-3" id="instance-page-title" data-i18n="instances">实例</h1>
+                        <span class="badge bg-secondary" id="instance-stats-badge">CPU: --% | Mem: -- MB</span>
+                    </div>
+                    <div id="instance-action-buttons" class="btn-toolbar">
+                        <div class="btn-group me-2">
+                            <button class="btn btn-success" data-action="start"><i
+                                    class="bi bi-play-fill me-1"></i><span
+                                    data-i18n="instances.start">启动</span></button>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-danger dropdown-toggle" data-bs-toggle="dropdown"
+                                    aria-expanded="false" data-action="stop">
+                                    <i class="bi bi-stop-fill me-1"></i><span data-i18n="instances.stop">关闭</span>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" data-action="stop"
+                                            data-i18n="instances.stop.stop">关闭 (SIGTERM)</a></li>
+                                    <li><a class="dropdown-item" href="#" data-action="terminate"
+                                            data-i18n="instances.stop.terminate">终止 (SIGKILL)</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="btn-group me-2">
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-warning dropdown-toggle" data-bs-toggle="dropdown"
+                                    aria-expanded="false" data-action="restart">
+                                    <i class="bi bi-arrow-clockwise me-1"></i><span
+                                        data-i18n="instances.restart">重启</span>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" data-action="restart"
+                                            data-i18n="instances.restart">重启</a></li>
+                                    <li><a class="dropdown-item" href="#" data-action="force-restart"
+                                            data-i18n="instances.restart.force">强制重启</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-secondary" data-action="edit-instance"><i
+                                    class="bi bi-gear-fill"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div id="terminal-container"></div>
+            </div>
+
+            <!-- 用户管理页面 -->
+            <div id="users-page" class="d-none">
+                <div class="d-flex justify-content-between align-items-center pb-2 mb-3 border-bottom">
+                    <input type="text" class="form-control me-2" id="user-search-input" style="max-width: 300px;">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
+                        <i class="bi bi-person-plus-fill"></i>
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="users.username">用户名</th>
+                                        <th data-i18n="users.role">角色</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="user-table-body">
+                                    <!-- User rows will be dynamically inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="file-manager-page" class="d-none">
+                <!-- 文件管理页面的内容，标题由 main.js 中的 page-title 处理 -->
+                <div id="file-manager-header" class="pb-2 mb-3 border-bottom d-none">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div id="file-manager-left-buttons" class="d-flex align-items-center">
+                            <button class="btn btn-secondary me-2" id="back-to-instances-btn" style="display:none;"><i
+                                    class="bi bi-arrow-left"></i></button>
+                            <input type="text" class="form-control form-control-sm" id="file-search-input"
+                                style="width: 200px;">
+                        </div>
+                        <div id="file-manager-right-buttons" class="d-flex align-items-center">
+                            <button class="btn btn-primary me-2" id="upload-file-btn" data-bs-toggle="modal"
+                                data-bs-target="#uploadFileModal"><i class="bi bi-cloud-arrow-up-fill"></i></button>
+                            <!-- 选区操作下拉框 -->
+                            <div class="dropdown me-2 d-none" id="selection-actions-dropdown">
+                                <button class="btn btn-info dropdown-toggle" type="button" id="selectionActionsDropdown"
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-check-square"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="selectionActionsDropdown">
+                                    <li><a class="dropdown-item" href="#" id="copy-selected-btn"><i
+                                                class="bi bi-clipboard-fill me-2"></i><span
+                                                data-i18n="files.copy">复制</span></a></li>
+                                    <li><a class="dropdown-item" href="#" id="cut-selected-btn"><i
+                                                class="bi bi-scissors me-2"></i><span
+                                                data-i18n="files.cut">剪切</span></a></li>
+                                    <li><a class="dropdown-item" href="#" id="compress-selected-btn"
+                                            data-bs-toggle="modal" data-bs-target="#compressFilesModal"><i
+                                                class="bi bi-box-arrow-in-down-right me-2"></i><span
+                                                data-i18n="files.compress">压缩</span></a></li>
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li><a class="dropdown-item text-danger" href="#" id="delete-selected-btn"><i
+                                                class="bi bi-trash-fill me-2"></i><span
+                                                data-i18n="files.delete">删除选中</span></a></li>
+                                </ul>
+                            </div>
+
+                            <!-- 粘贴按钮 -->
+                            <button class="btn btn-warning me-2 d-none" id="paste-btn"><i
+                                    class="bi bi-clipboard-check-fill"></i></button>
+
+                            <div class="dropdown">
+                                <button class="btn btn-secondary dropdown-toggle" type="button" id="newDropdown"
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="newDropdown">
+                                    <li><a class="dropdown-item" href="#" id="new-folder-btn"><i
+                                                class="bi bi-folder-plus me-2"></i><span
+                                                data-i18n="files.new.folder">新建文件夹</span></a></li>
+                                    <li><a class="dropdown-item" href="#" id="new-file-btn"><i
+                                                class="bi bi-file-earmark-plus me-2"></i><span
+                                                data-i18n="files.new.file">新建文件</span></a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 实例列表 -->
+                <div id="file-manager-instance-list" class="mb-3">
+                    <h5 data-i18n="instances.select">选择实例：</h5>
+                    <div class="list-group" id="instance-select-list">
+                        <!-- 实例将在此处动态加载 -->
+                    </div>
+                </div>
+
+                <!-- 文件浏览器 -->
+                <div id="file-browser" class="card d-none">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-0" id="path-breadcrumb">
+                                <!-- 面包屑导航将在此处动态加载 -->
+                            </ol>
+                        </nav>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-secondary" id="refresh-files-btn"><i
+                                    class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 30px;"><input type="checkbox" id="select-all-files"></th>
+                                        <th data-i18n="files.name">名称</th>
+                                        <th data-i18n="files.type">类型</th>
+                                        <th data-i18n="files.size">大小</th>
+                                        <th data-i18n="files.modified">修改时间</th>
+                                        <th data-i18n="files.operations">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="file-list-body">
+                                    <!-- 文件和文件夹将在此处动态加载 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 解压文件模态框 -->
+                <div class="modal fade" id="extractFileModal" tabindex="-1" aria-labelledby="extractFileModalLabel"
+                    aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="extractFileModalLabel" data-i18n="files.extract.title">解压文件
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="extract-form">
+                                    <div class="mb-3">
+                                        <label for="extract-file-name" class="form-label"
+                                            data-i18n="files.filename">文件名称</label>
+                                        <input type="text" class="form-control" id="extract-file-name" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="extract-destination-path" class="form-label"
+                                            data-i18n="files.extract.to">解压到 (相对路径，留空则为当前目录)</label>
+                                        <input type="text" class="form-control" id="extract-destination-path"
+                                            placeholder="folder">
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                                    data-i18n="cancel">取消</button>
+                                <button type="button" class="btn btn-primary" id="extract-submit-btn"
+                                    data-i18n="files.extract">解压</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 压缩文件模态框 -->
+                <div class="modal fade" id="compressFilesModal" tabindex="-1" aria-labelledby="compressFilesModalLabel"
+                    aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="compressFilesModalLabel" data-i18n="files.compress.title">
+                                    压缩文件</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="compress-form">
+                                    <div class="mb-3">
+                                        <label for="compress-output-name" class="form-label"
+                                            data-i18n="files.filename">文件名称</label>
+                                        <input type="text" class="form-control" id="compress-output-name"
+                                            placeholder="archive" required>
+                                        <small class="form-text text-muted"
+                                            id="compress-output-extension-display"></small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="compress-format" class="form-label"
+                                            data-i18n="files.compress.format">压缩格式</label>
+                                        <select class="form-select" id="compress-format">
+                                            <option value="zip">zip</option>
+                                            <option value="7z">7z</option>
+                                            <option value="tar.gz">tar.gz</option>
+                                            <option value="tar.xz">tar.xz</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="compress-level-slider" class="form-label"
+                                            data-i18n="files.compress.ratio">压缩比: <span
+                                                id="compress-level-display">5</span></label>
+                                        <input type="range" class="form-range" id="compress-level-slider" min="0"
+                                            max="9" value="5">
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                                    data-i18n="cancel">取消</button>
+                                <button type="button" class="btn btn-primary" id="compress-submit-btn"
+                                    data-i18n="files.compress">压缩</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+        <!-- 进度 Toast 将动态插入到这里 -->
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- Modals                                                            -->
+    <!-- ================================================================= -->
+
+    <!-- 创建实例 Modal -->
+    <div class="modal fade" id="createInstanceModal" tabindex="-1" aria-labelledby="createInstanceModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createInstanceModalLabel" data-i18n="instances.create.title">创建新实例</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="create-instance-form">
+                        <div class="mb-3">
+                            <label for="create-instance-name" class="form-label" data-i18n="instances.name">实例名</label>
+                            <input type="text" class="form-control" id="create-instance-name"
+                                placeholder="My Web Server">
+                            <div class="form-text" data-i18n="instances.name.hint">留空将生成一个随机名称</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="create-instance-type" class="form-label" data-i18n="instances.type">实例类型</label>
+                            <select class="form-select" id="create-instance-type">
+                                <option value="shell" selected data-i18n="instances.type.shell">Shell 命令</option>
+                                <option value="docker" data-i18n="instances.type.container">Docker 容器</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="create-instance-command" class="form-label" id="create-instance-command-label"
+                                data-i18n="instances.command">执行命令</label>
+                            <input type="text" class="form-control" id="create-instance-command" placeholder="bash"
+                                required>
+                        </div>
+                        <!-- Docker 容器设置 -->
+                        <div id="docker-settings-create" class="d-none">
+                            <hr>
+                            <h5 data-i18n="instances.docker.settings">Docker 容器设置</h5>
+                            <div class="modal-grid-row">
+                                <div class="modal-grid-col">
+                                    <div class="mb-3">
+                                        <label for="create-docker-image" class="form-label"
+                                            data-i18n="instances.docker.image">镜像名</label>
+                                        <input type="text" class="form-control" id="create-docker-image"
+                                            placeholder="ubuntu:latest" value="ubuntu:latest">
+                                    </div>
+                                </div>
+                                <div class="modal-grid-col">
+                                    <div class="mb-3">
+                                        <label for="create-docker-container-name" class="form-label"
+                                            data-i18n="instances.docker.container">容器名 (可选)</label>
+                                        <input type="text" class="form-control" id="create-docker-container-name"
+                                            placeholder="container-1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="create-docker-ports" class="form-label"
+                                    data-i18n="instances.docker.ports">端口转发 (可选)</label>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="edit-ports-btn"
+                                    data-i18n="instances.docker.ports.edit">编辑端口转发</button>
+                                <div id="create-docker-ports-display" class="form-control mt-2"
+                                    style="min-height: 38px;"></div>
+                                <input type="hidden" id="create-docker-ports-hidden">
+                                <div class="form-text" data-i18n="instances.docker.ports.hint">点击“编辑端口转发”按钮配置端口映射</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="create-docker-volumes" class="form-label"
+                                    data-i18n="instances.docker.volumes">文件挂载 (可选)</label>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                                    id="edit-volumes-btn" data-i18n="instances.docker.volumes.edit">编辑文件挂载</button>
+                                <div id="create-docker-volumes-display" class="form-control mt-2"
+                                    style="min-height: 38px;"></div>
+                                <input type="hidden" id="create-docker-volumes-hidden">
+                                <div class="form-text" data-i18n="instances.docker.volumes.hint">点击“编辑文件挂载”按钮配置文件挂载
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="create-docker-working-dir" class="form-label"
+                                    data-i18n="instances.docker.workdir">容器工作目录 (可选)</label>
+                                <input type="text" class="form-control" id="create-docker-working-dir"
+                                    placeholder="/workspace" value="/workspace">
+                                <div class="form-text" data-i18n="instances.docker.workdir.hint">
+                                    默认将实例工作目录挂载到此路径，容器启动命令将在此目录执行</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="create-docker-command" class="form-label"
+                                    data-i18n="instances.docker.command">容器启动命令 (可选)</label>
+                                <input type="text" class="form-control" id="create-docker-command"
+                                    placeholder="/bin/bash">
+                                <div class="form-text" data-i18n="instances.docker.command.hint">留空将使用镜像默认命令</div>
+                            </div>
+                            <hr>
+                        </div>
+                        <div class="mb-3">
+                            <label for="create-instance-cwd" class="form-label" data-i18n="instances.workdir">工作目录
+                                (可选)</label>
+                            <input type="text" class="form-control" id="create-instance-cwd"
+                                placeholder="/path/to/project">
+                            <div class="form-text" data-i18n="instances.workdir.hint">留空将自动在 'workspaces/' 目录下创建工作区
+                            </div>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="create-autostart">
+                            <label class="form-check-label" for="create-autostart"
+                                data-i18n="instances.options.autostart">后端启动时自动启动实例</label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="create-autodelete">
+                            <label class="form-check-label" for="create-autodelete"
+                                data-i18n="instances.options.autodelete">执行完成后自动删除实例</label>
+                        </div>
+                        <div class="mb-3">
+                            <label for="create-instance-env" class="form-label" data-i18n="instances.envvar">环境变量
+                                (可选)</label>
+                            <textarea class="form-control" id="create-instance-env" rows="3"
+                                placeholder="MY_VAR=my_value"></textarea>
+                            <div class="form-text" data-i18n="instances.envvar.hint">每行一个环境变量，格式为 KEY=VALUE</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="submit" class="btn btn-primary" form="create-instance-form"
+                        data-i18n="instances.create">创建实例</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置实例 Modal -->
+    <div class="modal fade" id="settingsInstanceModal" tabindex="-1" aria-labelledby="settingsInstanceModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="settingsInstanceModalLabel" data-i18n="instances.settings">实例设置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="settings-instance-form">
+                        <input type="hidden" id="settings-instance-id">
+                        <div class="mb-3">
+                            <label for="settings-instance-name" class="form-label"
+                                data-i18n="instances.name">实例名</label>
+                            <input type="text" class="form-control" id="settings-instance-name">
+                        </div>
+                        <div class="mb-3">
+                            <label for="settings-instance-command" class="form-label"
+                                id="settings-instance-command-label" data-i18n="instances.command">执行命令</label>
+                            <input type="text" class="form-control" id="settings-instance-command" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="settings-instance-cwd" class="form-label"
+                                data-i18n="instances.workdir">工作目录</label>
+                            <input type="text" class="form-control" id="settings-instance-cwd">
+                        </div>
+                        <!-- Docker 容器设置 -->
+                        <div id="docker-settings-settings" class="d-none">
+                            <hr>
+                            <h5 data-i18n="instances.docker.settings">Docker 容器设置</h5>
+                            <div class="modal-grid-row">
+                                <div class="modal-grid-col">
+                                    <div class="mb-3">
+                                        <label for="settings-docker-image" class="form-label"
+                                            data-i18n="instances.docker.image">镜像名</label>
+                                        <input type="text" class="form-control" id="settings-docker-image"
+                                            placeholder="ubuntu:latest" value="ubuntu:latest">
+                                    </div>
+                                </div>
+                                <div class="modal-grid-col">
+                                    <div class="mb-3">
+                                        <label for="settings-docker-container-name" class="form-label"
+                                            data-i18n="instances.docker.container">容器名 (可选)</label>
+                                        <input type="text" class="form-control" id="settings-docker-container-name"
+                                            placeholder="container-1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="settings-docker-ports" class="form-label"
+                                    data-i18n="instances.docker.ports">端口转发 (可选)</label>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                                    id="edit-settings-ports-btn" data-i18n="instances.docker.ports.edit">编辑端口转发</button>
+                                <div id="settings-docker-ports-display" class="form-control mt-2"
+                                    style="min-height: 38px;"></div>
+                                <input type="hidden" id="settings-docker-ports-hidden">
+                                <div class="form-text" data-i18n="instances.docker.ports.hint">点击“编辑端口转发”按钮配置端口映射</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="settings-docker-volumes" class="form-label"
+                                    data-i18n="instances.docker.volumes">文件挂载 (可选)</label>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                                    id="edit-settings-volumes-btn"
+                                    data-i18n="instances.docker.volumes.edit">编辑文件挂载</button>
+                                <div id="settings-docker-volumes-display" class="form-control mt-2"
+                                    style="min-height: 38px;"></div>
+                                <input type="hidden" id="settings-docker-volumes-hidden">
+                                <div class="form-text" data-i18n="instances.docker.volumes.hint">点击“编辑文件挂载”按钮配置文件挂载
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="settings-docker-working-dir" class="form-label"
+                                    data-i18n="instances.docker.workdir">容器工作目录 (可选)</label>
+                                <input type="text" class="form-control" id="settings-docker-working-dir"
+                                    placeholder="/workspace">
+                                <div class="form-text" data-i18n="instances.docker.workdir.hint">
+                                    默认将实例工作目录挂载到此路径，容器启动命令将在此目录执行</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="settings-docker-command" class="form-label"
+                                    data-i18n="instances.docker.command">容器启动命令 (可选)</label>
+                                <input type="text" class="form-control" id="settings-docker-command"
+                                    placeholder="/bin/bash">
+                                <div class="form-text" data-i18n="instances.docker.command.hint">留空将使用镜像默认命令</div>
+                            </div>
+                            <hr>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="settings-autostart">
+                            <label class="form-check-label" for="settings-autostart"
+                                data-i18n="instances.options.autostart">后端启动时自动启动实例</label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="settings-autorestart">
+                            <label class="form-check-label" for="settings-autorestart"
+                                data-i18n="instances.options.autorestart">实例退出后自动重启</label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="settings-autodelete">
+                            <label class="form-check-label" for="settings-autodelete"
+                                data-i18n="instances.options.autodelete">执行完成后自动删除实例</label>
+                        </div>
+                        <div class="mb-3">
+                            <label for="settings-instance-env" class="form-label" data-i18n="instances.envvar">环境变量
+                                (可选)</label>
+                            <textarea class="form-control" id="settings-instance-env" rows="3"
+                                placeholder="MY_VAR=my_value"></textarea>
+                            <div class="form-text" data-i18n="instances.envvar.hint">每行一个环境变量，格式为 KEY=VALUE</div>
+                        </div>
+                        <hr>
+                        <div class="mt-3">
+                            <h5 class="text-danger" data-i18n="instances.danger">危险区域</h5>
+                            <p data-i18n="instances.danger.delete.warning">删除实例的操作是不可逆的。请谨慎选择删除方式。</p>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-danger dropdown-toggle" data-bs-toggle="dropdown"
+                                    aria-expanded="false">
+                                    <i class="bi bi-trash me-1"></i> <span
+                                        data-i18n="instances.danger.delete">删除此实例</span>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item text-danger" href="#" data-action="remove-instance-only"
+                                            data-bs-toggle="modal" data-i18n="instances.danger.remove_only">仅移除实例</a>
+                                    </li>
+                                    <li><a class="dropdown-item text-danger" href="#"
+                                            data-action="delete-instance-with-data" data-bs-toggle="modal"
+                                            data-i18n="instances.danger.delete_all">删除实例并移除数据</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="submit" class="btn btn-primary" form="settings-instance-form"
+                        data-i18n="instances.save">保存更改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通用删除确认 Modal (用于文件、文件夹等) -->
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmDeleteModalLabel" data-i18n="confirm.delete.title">确认删除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirm-delete-message"></p>
+                    <p><span data-i18n="confirm.delete">您是否确定要删除：</span> <strong id="delete-item-name"></strong></p>
+                    <div id="delete-file-list-container" class="mt-3 mb-3 d-none">
+                        <ul id="delete-file-list" class="list-group list-group-flush">
+                            <!-- 文件列表将在此处动态加载 -->
+                        </ul>
+                    </div>
+                    <p class="text-danger fw-bold" data-i18n="confirm.irreversible">此操作不可逆！</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete-btn"
+                        data-i18n="confirm.delete.btn">确认删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建用户 Modal -->
+    <div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createUserModalLabel" data-i18n="users.create.title">创建新用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="create-user-form">
+                        <div class="mb-3">
+                            <label for="create-username" class="form-label" data-i18n="users.username">用户名</label>
+                            <input type="text" class="form-control" id="create-username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="create-password" class="form-label" data-i18n="users.password">密码</label>
+                            <input type="password" class="form-control" id="create-password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="create-role" class="form-label" data-i18n="users.role">角色</label>
+                            <select class="form-select" id="create-role">
+                                <option value="user" selected data-i18n="users.role.user">普通用户</option>
+                                <option value="admin" data-i18n="users.role.admin">管理员</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="submit" class="btn btn-primary" form="create-user-form"
+                        data-i18n="users.create">创建用户</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑用户权限 Modal -->
+    <div class="modal fade" id="editUserPermissionsModal" tabindex="-1" aria-labelledby="editUserPermissionsModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editUserPermissionsModalLabel"><span
+                            data-i18n="users.perms.edit">编辑用户权限：</span><span id="edit-permissions-username"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-permissions-userid">
+                    <div class="mb-3">
+                        <label for="edit-permissions-role" class="form-label"
+                            data-i18n="users.account.type">账号类型</label>
+                        <select class="form-select" id="edit-permissions-role">
+                            <option value="user" data-i18n="users.role.user">普通用户</option>
+                            <option value="admin" data-i18n="users.role.admin">管理员</option>
+                        </select>
+                    </div>
+                    <div id="instance-permissions-container">
+                        <p data-i18n="users.perms.edit.instances">为用户配置实例权限:</p>
+                        <div class="alert alert-info py-2" role="alert">
+                            <i class="bi bi-info-circle me-2"></i><span
+                                data-i18n="users.perms.edit.hint">终端权限和文件管理权限可独立配置</span>
+                        </div>
+                        <div id="instance-permissions-list" class="list-group">
+                            <!-- Instance permission items will be injected here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="close">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改密码 Modal -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="changePasswordModalLabel"><span
+                            data-i18n="users.change_password.title">修改用户密码：</span><span
+                            id="change-password-username-display"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="change-password-form" class="mt-3">
+                        <input type="hidden" id="change-password-userid">
+                        <div class="mb-3">
+                            <label for="old-password" class="form-label"
+                                data-i18n="users.change_password.old">旧密码</label>
+                            <input type="password" class="form-control" id="old-password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-password" class="form-label"
+                                data-i18n="users.change_password.new">新密码</label>
+                            <input type="password" class="form-control" id="new-password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirm-new-password" class="form-label"
+                                data-i18n="users.change_password.new.confirm">确认新密码</label>
+                            <input type="password" class="form-control" id="confirm-new-password" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-warning" form="change-password-form"
+                        data-i18n="users.change_password.change">修改</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="close">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm User Delete Modal -->
+    <div class="modal fade" id="confirmDeleteUserModal" tabindex="-1" aria-labelledby="confirmDeleteUserModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmDeleteUserModalLabel" data-i18n="users.delete.title">确认删除用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><span data-i18n="users.delete.hint">您是否确定要删除用户：</span> <strong
+                            id="confirm-delete-user-name"></strong></p>
+                    <p class="text-danger fw-bold" data-i18n="users.delete.irreversible">此操作不可逆，且会移除该用户在所有实例上的权限！</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete-user-btn"
+                        data-i18n="users.delete.confirm">确认删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文件上传 Modal -->
+    <div class="modal fade" id="uploadFileModal" tabindex="-1" aria-labelledby="uploadFileModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadFileModalLabel"><span data-i18n="files.upload.title">上传文件到</span>
+                        <span id="upload-current-path"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="file-input" class="form-label" data-i18n="files.upload.select">选择文件</label>
+                        <input class="form-control" type="file" id="file-input">
+                    </div>
+                    <div id="drop-area" class="border border-2 border-dashed rounded p-3 text-center mb-3">
+                        <p class="mb-0 text-muted" data-i18n="files.upload.hint1">拖放文件到此处上传</p>
+                        <small class="text-muted" data-i18n="files.upload.hint2">(或点击“选择文件”按钮)</small>
+                    </div>
+                    <div class="progress d-none mb-2">
+                        <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0"
+                            aria-valuemin="0" aria-valuemax="100" id="upload-progress-bar">0%</div>
+                    </div>
+                    <p id="upload-status" class="text-muted"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="upload-cancel-btn"
+                        data-i18n="cancel">取消</button>
+                    <button type="button" class="btn btn-primary" id="start-upload-btn" disabled
+                        data-i18n="files.upload.start">开始上传</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重命名 Modal -->
+    <div class="modal fade" id="renameModal" tabindex="-1" aria-labelledby="renameModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="renameModalLabel" data-i18n="files.rename">重命名</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="rename-form">
+                        <input type="hidden" id="rename-old-path">
+                        <div class="mb-3">
+                            <label for="rename-new-name" class="form-label" data-i18n="files.rename.new">新名称</label>
+                            <input type="text" class="form-control" id="rename-new-name" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="submit" class="btn btn-primary" id="rename-submit-btn" form="rename-form"
+                        data-i18n="files.rename">重命名</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建文件/文件夹 Modal -->
+    <div class="modal fade" id="createNewModal" tabindex="-1" aria-labelledby="createNewModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createNewModalLabel" data-i18n="files.create.title">新建...</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="create-new-form">
+                        <div class="mb-3">
+                            <label for="new-name-input" class="form-label" data-i18n="files.name"></label>
+                            <input type="text" class="form-control" id="new-name-input" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="submit" class="btn btn-primary" id="create-new-submit-btn" form="create-new-form"
+                        data-i18n="files.create">创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 端口转发 Modal -->
+    <div class="modal fade" id="portForwardingModal" tabindex="-1" aria-labelledby="portForwardingModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="portForwardingModalLabel" data-i18n="instances.docker.ports.title">
+                        端口转发设置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="add-port-row-btn">
+                            <i class="bi bi-plus-lg me-2"></i>
+                        </button>
+                    </div>
+                    <div id="port-list-editor">
+                        <!-- Port rows will be dynamically added here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-ports-btn"
+                        data-i18n="instances.docker.ports.save">保存端口设置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 目录挂载 Modal -->
+    <div class="modal fade" id="volumeMountingModal" tabindex="-1" aria-labelledby="volumeMountingModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="volumeMountingModalLabel" data-i18n="instances.docker.volumes.title">
+                        目录挂载设置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="add-volume-row-btn">
+                            <i class="bi bi-plus-lg me-2"></i>
+                        </button>
+                    </div>
+                    <div id="volume-list-editor">
+                        <!-- Volume rows will be dynamically added here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-volumes-btn"
+                        data-i18n="save.mounts">保存挂载设置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改用户名 Modal -->
+    <div class="modal fade" id="editUsernameModal" tabindex="-1" aria-labelledby="editUsernameModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editUsernameModalLabel"><span
+                            data-i18n="users.change_username.title">修改用户名：</span><span
+                            id="edit-username-display"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-username-form">
+                        <input type="hidden" id="edit-username-userid">
+                        <div class="mb-3">
+                            <label for="edit-username-input" class="form-label"
+                                data-i18n="users.change_username.new">新用户名</label>
+                            <input type="text" class="form-control" id="edit-username-input" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary" form="edit-username-form" data-i18n="save">保存</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monaco Editor 容器 Modal -->
+    <div class="modal fade" id="fileEditorModal" tabindex="-1" aria-labelledby="fileEditorModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fileEditorModalLabel"><span data-i18n="files.edit.title">编辑文件:</span>
+                        <span id="editing-file-path"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="editor-container" style="height: calc(100vh - 120px);"></div>
+                </div>
+                <div class="modal-footer">
+                    <span id="editor-status" class="me-auto text-muted"
+                        data-i18n="files.edit.connecting">正在连接到服务器...</span>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="close">关闭</button>
+                    <button type="button" class="btn btn-primary" id="save-file-btn" data-i18n="save">保存</button>
+                    <button type="button" class="btn btn-success" id="save-and-close-file-btn"
+                        data-i18n="files.edit.save_and_close">保存并关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Language Modal -->
+    <div class="modal fade" id="changeLanguageModal" tabindex="-1" aria-labelledby="changeLanguageModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="changeLanguageModalLabel"><span
+                            data-i18n="panel.change_language">修改语言</span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="change-language-form">
+                        <div class="mb-3">
+                            <label for="language-select" class="form-label"
+                                data-i18n="panel.select_language">选择语言</label>
+                            <select class="form-select" id="language-select">
+                                <option value="auto" data-i18n="language.auto">自动检测</option>
+                                <option value="zh_CN" data-i18n="language.zh_CN">简体中文</option>
+                                <option value="zh_TW" data-i18n="language.zh_TW">繁體中文</option>
+                                <option value="en" data-i18n="language.en">English</option>
+                                <option value="jp" data-i18n="language.jp">日本語</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
+                        data-i18n="cancel">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-language-btn" data-i18n="save">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/cdn/z4/bootstrap/5.3.8/js/bootstrap.bundle.js"></script>
+    <script src="/cdn/z4/xterm/5.4.0/xterm.js"></script>
+    <script src="/cdn/jsdelivr/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="/cdn/jsdelivr/monaco-editor@0.41.0/min/vs/base/worker/workerMain.js"></script>
+    <script src="/cdn/jsdelivr/monaco-editor@0.41.0/min/vs/base/common/worker/simpleWorker.nls.js"></script>
+    <script src="/cdn/z4/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+
+
+    <script src="/js/i18n.js"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/main.js"></script>
+    <script src="/js/file_manager.js"></script>
+
+</body>
+
+</html>

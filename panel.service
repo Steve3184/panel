@@ -1,0 +1,12 @@
+[Unit]
+Description=Panel
+
+[Service]
+Restart=on-failure
+RestartSec=5s
+WorkingDirectory=/opt/panel
+ExecStart=/usr/bin/node server.js
+ExecStop=/bin/kill -s TERM $MAINPID
+
+[Install]
+WantedBy=multi-user.target
