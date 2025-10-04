@@ -1523,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.confirmDeleteBtn.classList.remove('btn-danger');
             dom.confirmDeleteBtn.classList.add('btn-warning');
         } else {
-            dom.confirmDeleteBtn.textContent = i18n.t('instances.danger.delete.remove_only');
+            dom.confirmDeleteBtn.textContent = i18n.t('instances.danger.remove_only');
             dom.confirmDeleteBtn.classList.remove('btn-warning');
             dom.confirmDeleteBtn.classList.add('btn-danger');
         }
