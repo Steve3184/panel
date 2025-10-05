@@ -2349,92 +2349,100 @@ app.ws('/ws', (ws, req) => {
 // =================================================================
 // 系统全局监控
 setInterval(() => {
-    osUtils.cpuUsage(cpuPercent => {
-        const excludeClients = new Set();
-        // 排除订阅了终端的客户端
-        activeInstances.forEach(instance => {
-            instance.listeners.forEach(client => excludeClients.add(client));
-        });
-        // 排除订阅了文件的客户端
-        editingFileClients.forEach(client => excludeClients.add(client));
+    try {
+        osUtils.cpuUsage(cpuPercent => {
+            const excludeClients = new Set();
+            // 排除订阅了终端的客户端
+            activeInstances.forEach(instance => {
+                instance.listeners.forEach(client => excludeClients.add(client));
+            });
+            // 排除订阅了文件的客户端
+            editingFileClients.forEach(client => excludeClients.add(client));
 
-        broadcast({
-            type: 'system-stats',
-            cpu: (cpuPercent * 100).toFixed(2),
-            mem: ((osUtils.totalmem() - osUtils.freemem()) / 1024).toFixed(2),
-            totalMem: (osUtils.totalmem() / 1024).toFixed(2),
-        }, excludeClients);
-    });
+            broadcast({
+                type: 'system-stats',
+                cpu: (cpuPercent * 100).toFixed(2),
+                mem: ((osUtils.totalmem() - osUtils.freemem()) / 1024).toFixed(2),
+                totalMem: (osUtils.totalmem() / 1024).toFixed(2),
+            }, excludeClients);
+        });
+    } catch (error) {
+        console.error(i18n.t('server.system_stats_error', { error: error.message }));
+    }
 }, 2000);
 
 // 单个实例监控 (包括 Docker 和非 Docker)
 setInterval(() => {
-    activeInstances.forEach(async (session) => {
-        const instanceConfig = readDb(INSTANCES_DB_PATH).find(i => i.id === session.id);
-        if (!instanceConfig) return;
+    try {
+        activeInstances.forEach(async (session) => {
+            const instanceConfig = readDb(INSTANCES_DB_PATH).find(i => i.id === session.id);
+            if (!instanceConfig) return;
 
-        let cpu = '--';
-        let memory = '--';
+            let cpu = '--';
+            let memory = '--';
 
-        if (instanceConfig.type === 'docker' && instanceConfig.dockerContainerId) {
-            try {
-                const container = docker.getContainer(instanceConfig.dockerContainerId);
-                const statsStream = await container.stats({ stream: false }); // Get a single stats snapshot
-                const stats = statsStream; // statsStream is already the stats object when stream:false
+            if (instanceConfig.type === 'docker' && instanceConfig.dockerContainerId) {
+                try {
+                    const container = docker.getContainer(instanceConfig.dockerContainerId);
+                    const statsStream = await container.stats({ stream: false }); // Get a single stats snapshot
+                    const stats = statsStream; // statsStream is already the stats object when stream:false
 
-                if (stats) {
-                    cpu = calculateCpuUsage(stats);
-                    memory = calculateMemoryUsage(stats);
+                    if (stats) {
+                        cpu = calculateCpuUsage(stats);
+                        memory = calculateMemoryUsage(stats);
+                    }
+                } catch (err) {
+                    console.warn(i18n.t('server.docker_container_stats_failed', { containerId: instanceConfig.dockerContainerId, error: err.message }));
                 }
-            } catch (err) {
-                console.warn(`获取 Docker 容器 ${instanceConfig.dockerContainerId} 统计信息失败:`, err.message);
-            }
-        } else {
-            // 非 Docker 实例 (或 Docker 但没有 containerId 的情况)
-            psTree(session.pty.pid, (err, children) => {
-                if (err) {
-                    console.error(`获取进程树失败 (${session.pty.pid}):`, err.message);
-                    return;
-                }
-                const pids = [session.pty.pid, ...children.map(p => p.PID)];
-                pidusage(pids, (err, stats) => {
+            } else {
+                // 非 Docker 实例 (或 Docker 但没有 containerId 的情况)
+                psTree(session.pty.pid, (err, children) => {
                     if (err) {
-                        // 进程可能已经退出，但我们还没有收到 exit 事件
-                        if (!err.message.includes('No matching process')) {
-                            console.error(`获取 pidusage 统计信息失败 (${pids}):`, err.message);
-                        }
+                        console.error(i18n.t('server.get_process_tree_failed', { pid: session.pty.pid, error: err.message }));
                         return;
                     }
-                    const totalStats = Object.values(stats).reduce((acc, current) => {
-                        acc.cpu += current.cpu;
-                        acc.memory += current.memory;
-                        return acc;
-                    }, { cpu: 0, memory: 0 });
+                    const pids = [session.pty.pid, ...children.map(p => p.PID)];
+                    pidusage(pids, (err, stats) => {
+                        if (err) {
+                            // 进程可能已经退出，但我们还没有收到 exit 事件
+                            if (!err.message.includes('No matching process')) {
+                                console.error(i18n.t('server.get_pidusage_stats_failed', { pids: pids.join(', '), error: err.message }));
+                            }
+                            return;
+                        }
+                        const totalStats = Object.values(stats).reduce((acc, current) => {
+                            acc.cpu += current.cpu;
+                            acc.memory += current.memory;
+                            return acc;
+                        }, { cpu: 0, memory: 0 });
 
-                    cpu = totalStats.cpu.toFixed(2);
-                    memory = (totalStats.memory / 1024 / 1024).toFixed(2);
+                        cpu = totalStats.cpu.toFixed(2);
+                        memory = (totalStats.memory / 1024 / 1024).toFixed(2);
 
-                    const data = {
-                        type: 'instance-stats',
-                        id: session.id,
-                        cpu: cpu,
-                        memory: memory,
-                    };
-                    session.listeners.forEach(ws => send(ws, data));
+                        const data = {
+                            type: 'instance-stats',
+                            id: session.id,
+                            cpu: cpu,
+                            memory: memory,
+                        };
+                        session.listeners.forEach(ws => send(ws, data));
+                    });
                 });
-            });
-            // 对于非 Docker 实例，数据会在 psTree 的回调中发送
-            return;
-        }
+                // 对于非 Docker 实例，数据会在 psTree 的回调中发送
+                return;
+            }
 
-        const data = {
-            type: 'instance-stats',
-            id: session.id,
-            cpu: cpu,
-            memory: memory,
-        };
-        session.listeners.forEach(ws => send(ws, data));
-    });
+            const data = {
+                type: 'instance-stats',
+                id: session.id,
+                cpu: cpu,
+                memory: memory,
+            };
+            session.listeners.forEach(ws => send(ws, data));
+        });
+    } catch (error) {
+        console.error(i18n.t('server.instance_stats_error', { error: error.message }));
+    }
 }, 2000);
 
 // =================================================================
@@ -2447,9 +2455,7 @@ const instances = readDb(INSTANCES_DB_PATH, []);
         if (instance.autoStartOnBoot) {
             try {
                 await startInstance(instance);
-            } catch (error) {
-                console.error(`自动启动实例 ${instance.name} (${instance.id}) 失败:`, error.message);
-            }
+            } catch {}
         }
     }
 })();
