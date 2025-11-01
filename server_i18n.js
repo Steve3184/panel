@@ -5,7 +5,7 @@ const translations = {};
 let currentLang = 'en'; // Default language
 
 function loadTranslations(lang) {
-    const langFilePath = path.join(__dirname, 'public', 'lang', `${lang}.json`);
+    const langFilePath = path.join(__dirname, 'frontend', 'public', 'lang', `${lang}.json`);
     try {
         const data = fs.readFileSync(langFilePath, 'utf8');
         translations[lang] = JSON.parse(data);

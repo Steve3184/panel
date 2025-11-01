@@ -1,0 +1,67 @@
+import { ref, computed, inject } from 'vue';
+
+const i18nSymbol = Symbol('i18n');
+
+const translations = ref({});
+const currentLang = ref('auto');
+
+async function loadTranslations(langCode) {
+    let effectiveLangCode = langCode;
+    if (langCode === 'auto') {
+        const userLang = navigator.language || navigator.userLanguage;
+        if (userLang.startsWith('zh')) effectiveLangCode = 'zh_CN';
+        else if (userLang.startsWith('ja')) effectiveLangCode = 'jp';
+        else effectiveLangCode = 'en';
+    }
+
+    try {
+        const response = await fetch(`/lang/${effectiveLangCode}.json`);
+        if (!response.ok) throw new Error('Failed to load translations');
+        translations.value = await response.json();
+        currentLang.value = effectiveLangCode;
+        document.documentElement.lang = effectiveLangCode.split('_')[0];
+    } catch (error) {
+        console.error('Error loading translations:', error);
+        if (effectiveLangCode !== 'en') {
+            await loadTranslations('en'); // Fallback to English
+        }
+    }
+}
+
+function getLanguagePreference() {
+    const match = document.cookie.match(new RegExp('(^| )user_language=([^;]+)'));
+    return match ? match[2] : null;
+}
+
+function saveLanguagePreference(langCode) {
+    document.cookie = `user_language=${langCode}; path=/; max-age=31536000`;
+}
+
+function t(key, params = {}) {
+    let message = translations.value[key] || key;
+    for (const param in params) {
+        message = message.replace(`{${param}}`, params[param]);
+    }
+    return message;
+}
+
+export function useI18n() {
+    return inject(i18nSymbol);
+}
+
+export const i18nPlugin = {
+    install(app) {
+        const i18n = {
+            t,
+            loadTranslations,
+            saveLanguagePreference,
+            currentLang: computed(() => currentLang.value)
+        };
+
+        app.provide(i18nSymbol, i18n);
+        app.config.globalProperties.$t = t;
+
+        const preferredLang = getLanguagePreference() || 'auto';
+        loadTranslations(preferredLang);
+    }
+};

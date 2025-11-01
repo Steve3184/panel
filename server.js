@@ -90,19 +90,30 @@ app.use((req, res, next) => {
     next();
 });
 
+// Vue 项目的静态文件服务 (优先)
+const vueDistPath = path.join(__dirname, 'frontend', 'dist');
+if (fs.existsSync(path.join(vueDistPath, 'index.html'))) {
+    app.use(express.static(vueDistPath));
+    console.log('Serving Vue app from:', vueDistPath);
+} else {
+    console.warn('Vue app (frontend/dist/index.html) not found. Server will exit if not in setup mode.');
+}
+
+// 现有项目的静态文件服务 (作为备用)
 app.use(express.static(path.join(__dirname, 'public')));
+
 // 认证中间件
 const isAuthenticated = (req, res, next) => {
-    const publicPaths = ['/login.html', '/setup.html', '/api/login', '/api/setup', '/api/users/check']; // 添加 /api/users/check
-    if (publicPaths.includes(req.path) || req.path.startsWith('/css') || req.path.startsWith('/js')) {
+    const publicPaths = ['/', '/index.html', '/api/login', '/api/setup', '/api/users/check'];
+    // 允许访问 /frontend 路径下的资源，即使未认证
+    if (publicPaths.includes(req.path) || req.path.startsWith('/css') || req.path.startsWith('/js') || req.path.startsWith('/frontend')) {
         return next();
     }
     if (!req.session.user) {
-        // 如果是 API 请求，返回 401 Unauthorized
         if (req.xhr || req.headers.accept.indexOf('json') > -1) {
             return res.status(401).json({ message: 'server.unauthorized' });
         }
-        return res.redirect('/login.html');
+        return res.redirect('/');
     }
     next();
 };
@@ -1238,48 +1249,56 @@ app.post('/api/instances/:instanceId/upload/chunk', isAuthenticated, checkFileMa
     const busboy = Busboy({ headers: req.headers });
     let uploadId;
     let chunkIndex;
-    let chunkBuffer;
+    let fileBuffer = Buffer.alloc(0); // 用于存储文件分块数据
 
-    busboy.on('field', (fieldname, val, fieldnameTruncated, valTruncated, encoding, mimetype) => {
+    busboy.on('field', (fieldname, val) => {
         if (fieldname === 'uploadId') uploadId = val;
         if (fieldname === 'chunkIndex') chunkIndex = parseInt(val, 10);
     });
 
-    busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
-        const upload = activeUploads.get(uploadId);
-
-        if (!upload) {
-            file.resume(); // Consume the file stream to prevent it from hanging
-            return res.status(404).json({ message: 'server.upload_not_found_or_expired' });
-        }
-
-        if (upload.receivedChunks.has(chunkIndex)) {
-            file.resume(); // Consume the file stream to prevent it from hanging
-            return res.status(409).json({ message: 'server.chunk_already_received' });
-        }
-
+    busboy.on('file', (fieldname, file) => {
         file.on('data', (data) => {
-            upload.writeStream.write(data);
-            upload.receivedSize += data.length; // Accumulate received size
+            fileBuffer = Buffer.concat([fileBuffer, data]);
         });
 
         file.on('end', () => {
-            upload.receivedChunks.add(chunkIndex);
-            res.status(200).json({ message: 'server.ok', receivedSize: upload.receivedSize });
+            // 文件分块数据已完全接收到 fileBuffer 中
         });
 
         file.on('error', (err) => {
             console.error(err);
-            // Ensure uploadId is removed to prevent further invalid chunks
-            activeUploads.delete(uploadId);
-            upload.writeStream.end(); // Close the stream
-            fs.removeSync(upload.tempFilePath); // Delete the temporary file
-            res.status(500).json({ message: 'server.failed_to_write_chunk', error: err.message });
+            res.status(500).json({ message: 'server.failed_to_read_chunk_data', error: err.message });
+            req.unpipe(busboy); // 停止处理请求
         });
     });
 
-    busboy.on('finish', () => {
-        // Busboy finished parsing the request
+    busboy.on('finish', async () => {
+        const upload = activeUploads.get(uploadId);
+
+        if (!upload) {
+            return res.status(404).json({ message: 'server.upload_not_found_or_expired' });
+        }
+
+        if (upload.receivedChunks.has(chunkIndex)) {
+            return res.status(409).json({ message: 'server.chunk_already_received' });
+        }
+
+        try {
+            // 确保按顺序写入分块
+            // 这里我们假设前端会按顺序发送分块，如果乱序，需要更复杂的逻辑来缓存和排序
+            // 对于当前实现，我们直接写入
+            await fs.appendFile(upload.tempFilePath, fileBuffer);
+            upload.receivedChunks.add(chunkIndex);
+            upload.receivedSize += fileBuffer.length; // Accumulate received size
+
+            res.status(200).json({ message: 'server.ok', receivedSize: upload.receivedSize });
+        } catch (err) {
+            console.error(err);
+            activeUploads.delete(uploadId);
+            if (upload.writeStream) upload.writeStream.end(); // Close the stream if it's still open
+            fs.removeSync(upload.tempFilePath); // Delete the temporary file
+            res.status(500).json({ message: 'server.failed_to_write_chunk', error: err.message });
+        }
     });
 
     busboy.on('error', (err) => {
@@ -2469,7 +2488,13 @@ app.get('/login.html', (req, res) => {
 });
 
 app.get('*', isAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    const vueIndexHtmlPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
+    if (fs.existsSync(vueIndexHtmlPath)) {
+        res.sendFile(vueIndexHtmlPath);
+    } else {
+        console.error('Error: frontend/dist/index.html not found. Exiting with code 1.');
+        process.exit(1);
+    }
 });
 
 const lang = process.env.PANEL_LANG || 'en';
