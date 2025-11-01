@@ -40,6 +40,7 @@ const editorContainerEle = ref(null);
 let modal = null;
 let editor = null;
 let ws = null;
+let autoSaveTimer = null;
 
 const status = ref('Connecting...');
 const isSaving = ref(false);
@@ -47,6 +48,10 @@ const isSaving = ref(false);
 onMounted(() => {
   modal = new bootstrap.Modal(modalEle.value, { backdrop: 'static', keyboard: false });
   modalEle.value.addEventListener('hidden.bs.modal', cleanup);
+  if (uiStore.modals.fileEditor) {
+    modal.show();
+    initializeEditor();
+  }
 });
 
 onBeforeUnmount(() => {
@@ -78,9 +83,30 @@ const initializeEditor = async () => {
         });
         status.value = "File loaded.";
         setupWebSocket();
+        setupEditorListeners();
     } catch(error) {
         status.value = `Error: ${error.message}`;
         uiStore.showToast(status.value, 'danger');
+    }
+};
+
+const setupEditorListeners = () => {
+    if (!editor) return;
+
+    editor.onDidChangeModelContent(() => {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(() => {
+            saveContent(false);
+        }, 5000); // 5 seconds after last edit
+    });
+
+    window.addEventListener('keydown', handleKeyDown);
+};
+
+const handleKeyDown = (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        saveContent(false);
     }
 };
 
@@ -90,7 +116,6 @@ const setupWebSocket = () => {
         status.value = "WebSocket not connected.";
         return;
     }
-    // No need to add a new listener, just send subscribe message
     websocketStore.sendMessage({
         type: 'subscribe-file-edit',
         instanceId: props.instanceId,
@@ -110,19 +135,30 @@ const saveContent = (closeAfterSave = false) => {
         content: editor.getValue(),
         closeEditor: closeAfterSave
     });
-    // Assuming backend sends a confirmation message
-    // For now, we'll just update status and potentially close
-    setTimeout(() => { // Simulate save confirmation
+    setTimeout(() => {
         status.value = "Saved.";
         isSaving.value = false;
         if(closeAfterSave) close();
-    }, 1000);
+    }, 1000); // :(
 };
 
 const getLanguageFromPath = (path) => {
     const ext = path.split('.').pop().toLowerCase();
-    // Simplified mapping
-    const map = { js: 'javascript', ts: 'typescript', json: 'json', html: 'html', css: 'css', md: 'markdown', py: 'python', java: 'java' };
+    const map = {
+        js: 'javascript',
+        ts: 'typescript',
+        json: 'json',
+        html: 'html',
+        css: 'css',
+        md: 'markdown',
+        py: 'python',
+        java: 'java',
+        yaml: 'yaml',
+        yml: 'yaml',
+        toml: 'ini',
+        ini: 'ini',
+        config: 'ini',
+    };
     return map[ext] || 'plaintext';
 };
 
@@ -130,6 +166,8 @@ const cleanup = () => {
     if (ws) {
         websocketStore.sendMessage({ type: 'unsubscribe-file-edit', instanceId: props.instanceId, filePath: props.filePath });
     }
+    clearTimeout(autoSaveTimer);
+    window.removeEventListener('keydown', handleKeyDown);
     editor?.dispose();
     editor = null;
     ws = null;
