@@ -12,8 +12,10 @@
         <div class="modal-footer">
           <span class="me-auto text-muted">{{ status }}</span>
           <button type="button" class="btn btn-secondary" @click="close">{{ $t('files.editor.close') }}</button>
-          <button type="button" class="btn btn-primary" @click="saveContent(false)" :disabled="isSaving">{{ $t('files.editor.save') }}</button>
-           <button type="button" class="btn btn-success" @click="saveContent(true)" :disabled="isSaving">{{ $t('files.editor.save_and_close') }}</button>
+          <button type="button" class="btn btn-primary" @click="saveContent(false)" :disabled="isSaving">{{
+            $t('files.editor.save') }}</button>
+          <button type="button" class="btn btn-success" @click="saveContent(true)" :disabled="isSaving">{{
+            $t('files.editor.save_and_close') }}</button>
         </div>
       </div>
     </div>
@@ -57,8 +59,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-    cleanup();
-    modal?.dispose();
+  cleanup();
+  modal?.dispose();
 });
 
 watch(() => uiStore.modals.fileEditor, async (isVisible) => {
@@ -72,107 +74,111 @@ watch(() => uiStore.modals.fileEditor, async (isVisible) => {
 });
 
 const initializeEditor = async () => {
-    if (editor) editor.dispose();
-    status.value = t('files.editor.status.loading_file');
+  if (editor) editor.dispose();
+  status.value = t('files.editor.status.loading_file');
 
-    try {
-        const { content } = await api.getFileContent(props.instanceId, props.filePath);
-        editor = monaco.editor.create(editorContainerEle.value, {
-            value: content,
-            language: getLanguageFromPath(props.filePath),
-            theme: 'vs-dark',
-            automaticLayout: true,
-        });
-        status.value = t('files.editor.status.file_loaded');
-        setupWebSocket();
-        setupEditorListeners();
-    } catch(error) {
-        status.value = t('files.editor.status.error', { message: error.message });
-        uiStore.showToast(status.value, 'danger');
-    }
+  try {
+    const { content } = await api.getFileContent(props.instanceId, props.filePath);
+    editor = monaco.editor.create(editorContainerEle.value, {
+      value: content,
+      language: getLanguageFromPath(props.filePath),
+      theme: 'vs-dark',
+      automaticLayout: true,
+    });
+    status.value = t('files.editor.status.file_loaded');
+    setupWebSocket();
+    setupEditorListeners();
+  } catch (error) {
+    status.value = t('files.editor.status.error', { message: error.message });
+    uiStore.showToast(status.value, 'danger');
+  }
 };
 
 const setupEditorListeners = () => {
-    if (!editor) return;
+  if (!editor) return;
 
-    editor.onDidChangeModelContent(() => {
-        clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(() => {
-            saveContent(false);
-        }, 5000); // 5 seconds after last edit
-    });
+  editor.onDidChangeModelContent(() => {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+      saveContent(false);
+    }, 5000); // 5 seconds after last edit
+  });
 
-    window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keydown', handleKeyDown);
 };
 
 const handleKeyDown = (event) => {
-    if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-        event.preventDefault();
-        saveContent(false);
-    }
+  if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+    event.preventDefault();
+    saveContent(false);
+  }
 };
 
 const setupWebSocket = () => {
-    ws = websocketStore.getSocket();
-    if (!ws) {
-        status.value = t('files.editor.status.ws_not_connected');
-        return;
+  ws = websocketStore.getSocket();
+  if (!ws) {
+    status.value = t('files.editor.status.ws_not_connected');
+    return;
+  }
+  websocketStore.sendMessage({
+    type: 'subscribe-file-edit',
+    instanceId: props.instanceId,
+    filePath: props.filePath
+  });
+  websocketStore.onMessage((message) => {
+    if (message.type === 'file-saved-notification' && message.filePath === props.filePath) {
+      status.value = t('files.editor.status.saved');
+      isSaving.value = false;
+      if (message.closeEditor) {
+        close();
+      }
     }
-    websocketStore.sendMessage({
-        type: 'subscribe-file-edit',
-        instanceId: props.instanceId,
-        filePath: props.filePath
-    });
-    status.value = t('files.editor.status.connected');
+  });
+  status.value = t('files.editor.status.connected');
 };
 
 const saveContent = (closeAfterSave = false) => {
-    if (!editor || !ws) return;
-    isSaving.value = true;
-    status.value = t('files.editor.status.saving');
-    websocketStore.sendMessage({
-        type: 'save-file',
-        instanceId: props.instanceId,
-        filePath: props.filePath,
-        content: editor.getValue(),
-        closeEditor: closeAfterSave
-    });
-    setTimeout(() => {
-        status.value = t('files.editor.status.saved');
-        isSaving.value = false;
-        if(closeAfterSave) close();
-    }, 1000); // :(
+  if (!editor || !ws) return;
+  isSaving.value = true;
+  status.value = t('files.editor.status.saving');
+  websocketStore.sendMessage({
+    type: 'save-file',
+    instanceId: props.instanceId,
+    filePath: props.filePath,
+    content: editor.getValue(),
+    closeEditor: closeAfterSave
+  });
 };
 
 const getLanguageFromPath = (path) => {
-    const ext = path.split('.').pop().toLowerCase();
-    const map = {
-        js: 'javascript',
-        ts: 'typescript',
-        json: 'json',
-        html: 'html',
-        css: 'css',
-        md: 'markdown',
-        py: 'python',
-        java: 'java',
-        yaml: 'yaml',
-        yml: 'yaml',
-        toml: 'ini',
-        ini: 'ini',
-        config: 'ini',
-    };
-    return map[ext] || 'plaintext';
+  const ext = path.split('.').pop().toLowerCase();
+  const map = {
+    js: 'javascript',
+    ts: 'typescript',
+    json: 'json',
+    html: 'html',
+    css: 'css',
+    md: 'markdown',
+    py: 'python',
+    java: 'java',
+    yaml: 'yaml',
+    yml: 'yaml',
+    toml: 'ini',
+    ini: 'ini',
+    config: 'ini',
+  };
+  return map[ext] || 'plaintext';
 };
 
 const cleanup = () => {
-    if (ws) {
-        websocketStore.sendMessage({ type: 'unsubscribe-file-edit', instanceId: props.instanceId, filePath: props.filePath });
-    }
-    clearTimeout(autoSaveTimer);
-    window.removeEventListener('keydown', handleKeyDown);
-    editor?.dispose();
-    editor = null;
-    ws = null;
+  if (ws) {
+    websocketStore.sendMessage({ type: 'unsubscribe-file-edit', instanceId: props.instanceId, filePath: props.filePath });
+  }
+  clearTimeout(autoSaveTimer);
+  window.removeEventListener('keydown', handleKeyDown);
+  editor?.dispose();
+  editor = null;
+  ws = null;
 };
 
 const close = () => uiStore.closeModal('fileEditor');

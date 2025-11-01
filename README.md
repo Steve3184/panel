@@ -43,9 +43,6 @@ A powerful and user-friendly web-based server management panel designed to strea
 -   **Internationalization (i18n)**:
     -   Full multi-language support on both frontend and backend for a localized experience.
 
--   **CDN Caching**:
-    -   Automatically caches CDN resources locally, improving loading speeds and enhancing stability. This design is particularly beneficial for intranet environments, allowing users to copy the `cdn_cache` folder for direct use in purely internal networks without external connectivity.
-
 -   **Responsive UI**:
     -   Modern and responsive user interface adapts to various screen sizes, providing a consistent experience across desktops, tablets, and mobile devices.
     -   Collapsible sidebar and dynamic layout adjustments in the file manager for optimal usability.
@@ -84,9 +81,16 @@ For optimal operation, it is recommended to install Panel as a systemd service. 
 3.  **Install dependencies:**
     ```bash
     npm install
+    cd frontend && npm install
     ```
 
-4.  **Copy and configure the systemd service file:**
+4.  **Build the frontend:**
+    ```bash
+    npm run build --prefix frontend
+    ```
+
+
+5.  **Copy and configure the systemd service file:**
     - a.  Copy the provided `panel.service` file to the systemd directory:
         ```bash
         sudo cp panel.service /etc/systemd/system/
@@ -95,24 +99,24 @@ For optimal operation, it is recommended to install Panel as a systemd service. 
         ```
         # Example modification if your project is in /home/user/panel
         # WorkingDirectory=/home/user/panel
-        # ExecStart=/usr/bin/node /home/user/panel/server.js
+        # ExecStart=/usr/bin/node /home/user/panel/src/server.js
         ```
         **Note**: The `ExecStart` path must be the absolute path to `server.js`.
 
-5.  **Reload systemd, enable, and start the Panel service:**
+6.  **Reload systemd, enable, and start the Panel service:**
     ```bash
     sudo systemctl daemon-reload
     sudo systemctl enable panel
     sudo systemctl start panel
     ```
 
-6.  **Check the service status:**
+7.  **Check the service status:**
     ```bash
     systemctl status panel
     ```
 
-7.  **Initial Setup:**
-    On first launch, if no admin user exists, you will be redirected to `http://localhost:3000/setup.html` to create an admin account.
+8.  **Initial Setup:**
+    On first launch, if no admin user exists, you will be redirected to `http://localhost:3000/setup` to create an admin account.
 
 ### Configuration
 
@@ -122,7 +126,7 @@ You can configure the server language by setting the `PANEL_LANG` environment va
 PANEL_LANG=jp npm start
 ```
 
-Supported languages are defined in the `public/lang/` directory (e.g., `en.json`, `zh_CN.json`, `jp.json`).
+Supported languages are defined in the `frontend/public/lang/` directory (e.g., `en.json`, `zh_CN.json`, `jp.json`).
 
 ## 📸 Screenshots
 

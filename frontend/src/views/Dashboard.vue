@@ -48,7 +48,7 @@
                     </div>
                 </div>
             </div>
-             <p v-if="filteredInstances.length === 0" class="text-muted">{{ $t('instances.no_instances_found') }}</p>
+             <p v-if="filteredInstances.length === 0" class="text-muted">{{ $t('files.instance.no_instances_found') }}</p>
         </div>
       </div>
     </main>

@@ -60,7 +60,7 @@
     "files.create.folder_failed_toast": "創建資料夾失敗: {message}",
     "files.create.folder_success_toast": "資料夾 '{folderName}' 創建成功",
     "files.create.name_cannot_be_empty_toast": "名稱不能為空",
-    "files.create.title": "新增...",
+    "files.create.title": "新增{type}...",
     "files.cut": "剪下",
     "files.cut.items_success": "已剪下 {count} 個項目到剪貼簿",
     "files.delete.bulk_failed_console": "批次刪除失敗",
@@ -568,5 +568,16 @@
     "websocket.connection.lost": "與伺服器的連接已斷開。正在重新連接...",
     "websocket.error": "WebSocket 錯誤:",
     "websocket.established": "後端 ws 連結成功",
-    "websocket.lost": "後端ws連接異常!"
+    "websocket.lost": "後端ws連接異常!",
+    "panelSettings.title": "面板設定",
+    "panelSettings.panelName": "面板標題",
+    "panelSettings.panelLogo": "面板Logo",
+    "panelSettings.enableGradioTunnel": "啟用 Gradio Tunnel",
+    "panelSettings.tunnelToken": "隧道令牌",
+    "panelSettings.generatedGradioTunnelLink": "生成的 Gradio Tunnel 連結",
+    "panelSettings.panelPort": "面板埠",
+    "panelSettings.restartPanel": "重啟面板",
+    "panelSettings.savedSuccess": "面板設定已儲存",
+    "panelSettings.savedFailed": "儲存面板設定失敗",
+    "panelSettings.restartingPanel": "面板正在重啟，請稍候..."
   }

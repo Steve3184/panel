@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia';
 import { ref, reactive } from 'vue';
 import { useI18n } from '../composables/useI18n';
+import api from '../services/api'; // Import api service
 
 export const useUiStore = defineStore('ui', () => {
     const { t } = useI18n();
     const isSidebarCollapsed = ref(false);
     const activePage = ref('overview'); // For switching between 'overview' and 'file-manager' in Dashboard
+    const panelLogo = ref('');
+    const panelSettings = ref(null); // New state for panel settings
     
     // Modal visibility state
     const modals = reactive({
@@ -28,12 +31,17 @@ export const useUiStore = defineStore('ui', () => {
         volumeMounting: false,
         // Other Modals
         changeLanguage: false,
+        panelSettings: false, // Add panel settings modal
     });
 
     const selectedUserForPasswordChange = ref(null); // New state for user whose password is to be changed
 
     const toasts = ref([]);
     const activeProgressToasts = new Map();
+
+    function updatePanelLogo(newPanelLogo) {
+        panelLogo.value = newPanelLogo;
+    }
 
     function toggleSidebar() {
         isSidebarCollapsed.value = !isSidebarCollapsed.value;
@@ -46,6 +54,18 @@ export const useUiStore = defineStore('ui', () => {
     function openModal(modalName) {
         if (modalName in modals) {
             modals[modalName] = true;
+            if (modalName === 'panelSettings') {
+                _fetchPanelSettings(); // Call the internal function
+            }
+        }
+    }
+
+    async function _fetchPanelSettings() {
+        try {
+            panelSettings.value = await api.getPanelSettings();
+        } catch (error) {
+            console.error('Failed to fetch panel settings:', error);
+            showToast(t('settings.panel.fetchError', { error: error.message }), 'danger');
         }
     }
 
@@ -119,6 +139,9 @@ export const useUiStore = defineStore('ui', () => {
         modals,
         selectedUserForPasswordChange,
         toasts,
+        panelLogo,
+        panelSettings, // Expose panelSettings
+        updatePanelLogo,
         toggleSidebar,
         setActivePage,
         openModal,
@@ -126,6 +149,7 @@ export const useUiStore = defineStore('ui', () => {
         showToast,
         removeToast,
         updateProgressToast,
-        updateStatusToast
+        updateStatusToast,
+        fetchPanelSettings: _fetchPanelSettings // Expose the internal function
     };
 });

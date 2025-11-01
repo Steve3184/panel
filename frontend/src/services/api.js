@@ -65,9 +65,9 @@ export default {
   createUser: (userData) => request('/api/users', { method: 'POST', body: JSON.stringify(userData) }),
   deleteUser: (userId) => request(`/api/users/${userId}`, { method: 'DELETE' }),
   updateUserPermission: (instanceId, userId, permissions) => request(`/api/instances/${instanceId}/permissions/${userId}`, { method: 'PUT', body: JSON.stringify(permissions) }),
-  updateUserRole: (userId, role) => request(`/api/users/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
-  changePassword: (userId, passwords) => request(`/api/users/${userId}/password`, { method: 'PUT', body: JSON.stringify(passwords) }),
-  updateUsername: (userId, username) => request(`/api/users/${userId}/username`, { method: 'PUT', body: JSON.stringify({ username }) }),
+  updateUserRole: (userId, role) => request(`/api/users/${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  changePassword: (userId, passwords) => request(`/api/users/${userId}`, { method: 'PUT', body: JSON.stringify(passwords) }),
+  updateUsername: (userId, username) => request(`/api/users/${userId}`, { method: 'PUT', body: JSON.stringify({ username }) }),
 
   // File Manager
   getFiles: (instanceId, path) => request(`/api/instances/${instanceId}/files/${encodeURIComponent(path)}`),
@@ -81,4 +81,9 @@ export default {
   move: (instanceId, files, destination) => request(`/api/instances/${instanceId}/move`, { method: 'POST', body: JSON.stringify({ files, destination }) }),
   extract: (instanceId, filePath, destinationPath) => request(`/api/instances/${instanceId}/extract`, { method: 'POST', body: JSON.stringify({ filePath, destinationPath }) }),
   compress: (instanceId, filesToCompress, destinationPath, outputName, format, level) => request(`/api/instances/${instanceId}/compress`, { method: 'POST', body: JSON.stringify({ filesToCompress, destinationPath, outputName, format, level }) }),
+
+  // Panel Settings
+  getPanelSettings: () => request('/api/panel-settings'),
+  updatePanelSettings: (settings) => request('/api/panel-settings', { method: 'POST', body: JSON.stringify(settings) }),
+  restartPanel: () => request('/api/panel-settings/restart', { method: 'POST' }),
 };

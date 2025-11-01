@@ -43,9 +43,6 @@
 -   **国际化 (i18n)**:
     -   前端和后端完全支持多语言，提供本地化体验。
 
--   **CDN 缓存**:
-    -   自动将 CDN 资源缓存在本地，提高加载速度并增强稳定性。此设计对内网环境特别有益，用户可以复制 `cdn_cache` 文件夹，在无外部连接的纯内网中直接使用。
-
 -   **响应式界面**:
     -   现代化且响应式的用户界面，能适应各种屏幕尺寸，在桌面、平板和移动设备上提供一致的体验。
     -   可折叠的侧边栏和文件管理器中的动态布局调整，以实现最佳可用性。
@@ -84,9 +81,15 @@
 3.  **安装依赖:**
     ```bash
     npm install
+    cd frontend && npm install
     ```
 
-4.  **复制并配置 systemd 服务文件:**
+4.  **构建前端:**
+    ```bash
+    npm run build --prefix frontend
+    ```
+
+5.  **复制并配置 systemd 服务文件:**
     - a.  将提供的 `panel.service` 文件复制到 systemd 目录：
         ```bash
         sudo cp panel.service /etc/systemd/system/
@@ -95,24 +98,24 @@
         ```
         # 如果您的项目在 /home/user/panel 中的修改示例
         # WorkingDirectory=/home/user/panel
-        # ExecStart=/usr/bin/node /home/user/panel/server.js
+        # ExecStart=/usr/bin/node /home/user/panel/src/server.js
         ```
         **注意**: `ExecStart` 的路径必须是 `server.js` 的绝对路径。
 
-5.  **重新加载 systemd，启用并启动 Panel 服务:**
+6.  **重新加载 systemd，启用并启动 Panel 服务:**
     ```bash
     sudo systemctl daemon-reload
     sudo systemctl enable panel
     sudo systemctl start panel
     ```
 
-6.  **检查服务状态:**
+7.  **检查服务状态:**
     ```bash
     systemctl status panel
     ```
 
-7.  **初始设置:**
-    首次启动时，如果不存在管理员用户，您将被重定向到 `http://localhost:3000/setup.html` 来创建一个管理员帐户。
+8.  **初始设置:**
+    首次启动时，如果不存在管理员用户，您将被重定向到 `http://localhost:3000/setup` 来创建一个管理员帐户。
 
 ### 配置
 

@@ -2,7 +2,11 @@
     <nav class="sidebar p-3" :class="{ 'collapsed': uiStore.isSidebarCollapsed }">
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4 class="mb-0"><i class="bi bi-server me-2"></i><span>{{ t('panel.name') }}</span></h4>
+            <h4 class="mb-0">
+                <img v-if="uiStore.panelLogo != undefined" :src="uiStore.panelLogo" alt="Panel Logo" class="sidebar-logo me-2" />
+                <i v-else class="bi bi-server me-2"></i>
+                <span>{{ t('panel.name') }}</span>
+            </h4>
             <button class="btn btn-dark d-block d-md-none" @click="uiStore.toggleSidebar">
                 <i class="bi bi-x-lg"></i>
             </button>
@@ -25,6 +29,11 @@
                 <router-link to="/users" class="nav-link" active-class="active">
                     <i class="bi bi-people-fill me-2"></i><span>{{ t('title.users') }}</span>
                 </router-link>
+            </li>
+            <li class="nav-item" v-if="sessionStore.currentUser?.role === 'admin'">
+                <a href="#" class="nav-link" @click.prevent="openPanelSettings">
+                    <i class="bi bi-gear-fill me-2"></i><span>{{ t('panelSettings.title') }}</span>
+                </a>
             </li>
         </ul>
         <hr>
@@ -56,4 +65,8 @@ const uiStore = useUiStore();
 const instancesStore = useInstancesStore();
 const sessionStore = useSessionStore();
 const { t } = useI18n();
+
+const openPanelSettings = () => {
+  uiStore.openModal('panelSettings')
+};
 </script>

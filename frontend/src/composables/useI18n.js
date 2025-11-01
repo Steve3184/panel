@@ -17,7 +17,8 @@ async function loadTranslations(langCode) {
     try {
         const response = await fetch(`/lang/${effectiveLangCode}.json`);
         if (!response.ok) throw new Error('Failed to load translations');
-        translations.value = await response.json();
+        const loadedTranslations = await response.json();
+        translations.value = { ...loadedTranslations }; // 确保是响应式对象
         currentLang.value = effectiveLangCode;
         document.documentElement.lang = effectiveLangCode.split('_')[0];
     } catch (error) {
@@ -50,7 +51,7 @@ export function useI18n() {
 }
 
 export const i18nPlugin = {
-    install(app) {
+    install(app, options) {
         const i18n = {
             t,
             loadTranslations,
@@ -62,6 +63,14 @@ export const i18nPlugin = {
         app.config.globalProperties.$t = t;
 
         const preferredLang = getLanguagePreference() || 'auto';
-        loadTranslations(preferredLang);
+        if (options && options.panelSettings && options.panelSettings.panelName) {
+            translations.value['panel.name'] = options.panelSettings.panelName;
+        }
+        loadTranslations(preferredLang).then(() => {
+            // 在加载完语言包后，如果panelSettings中存在panelName，则覆盖panel.name
+            if (options && options.panelSettings && options.panelSettings.panelName) {
+                translations.value['panel.name'] = options.panelSettings.panelName;
+            }
+        });
     }
 };

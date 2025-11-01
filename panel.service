@@ -5,7 +5,7 @@ Description=Panel
 Restart=on-failure
 RestartSec=5s
 WorkingDirectory=/opt/panel
-ExecStart=/usr/bin/node server.js
+ExecStart=/usr/bin/node src/server.js
 ExecStop=/bin/kill -s TERM $MAINPID
 
 [Install]

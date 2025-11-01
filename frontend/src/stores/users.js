@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import api from '../services/api';
 import { useUiStore } from './ui';
 import { useInstancesStore } from './instances';
+import { useSessionStore } from './session';
 import { useI18n } from '../composables/useI18n';
 
 export const useUsersStore = defineStore('users', () => {

@@ -247,3 +247,9 @@ body {
     }
 }
 
+
+.sidebar-logo {
+    height: 2rem; /* Adjust as needed */
+    width: auto;
+    vertical-align: middle;
+}

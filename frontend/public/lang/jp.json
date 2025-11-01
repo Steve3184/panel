@@ -60,7 +60,7 @@
     "files.create.folder_failed_toast": "フォルダの作成に失敗しました: {message}",
     "files.create.folder_success_toast": "フォルダ '{folderName}' が正常に作成されました",
     "files.create.name_cannot_be_empty_toast": "名前は空にできません",
-    "files.create.title": "新規作成...",
+    "files.create.title": "新規作成{type}...",
     "files.cut": "切り取り",
     "files.cut.items_success": "{count}個の項目をクリップボードに切り取りました",
     "files.delete.bulk_failed_console": "一括削除に失敗しました",
@@ -568,5 +568,16 @@
     "websocket.connection.lost": "サーバーへの接続が失われました。再接続しています...",
     "websocket.error": "WebSocketエラー:",
     "websocket.established": "バックエンドwsリンクが成功しました",
-    "websocket.lost": "バックエンドws接続エラー!"
+    "websocket.lost": "バックエンドws接続エラー!",
+    "panelSettings.title": "パネル設定",
+    "panelSettings.panelName": "パネルタイトル",
+    "panelSettings.panelLogo": "パネルロゴ",
+    "panelSettings.enableGradioTunnel": "Gradioトンネルを有効にする",
+    "panelSettings.tunnelToken": "トンネルトークン",
+    "panelSettings.generatedGradioTunnelLink": "生成されたGradioトンネルリンク",
+    "panelSettings.panelPort": "パネルポート",
+    "panelSettings.restartPanel": "パネルを再起動",
+    "panelSettings.savedSuccess": "パネル設定が保存されました",
+    "panelSettings.savedFailed": "パネル設定の保存に失敗しました",
+    "panelSettings.restartingPanel": "パネルを再起動しています。しばらくお待ちください..."
   }

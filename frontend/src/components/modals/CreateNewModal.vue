@@ -4,12 +4,12 @@
       <div class="modal-content">
         <form @submit.prevent="handleSubmit">
           <div class="modal-header">
-            <h5 class="modal-title">{{ $t('files.create.title') }} {{ type === 'file' ? $t('files.file') : $t('files.folder') }}</h5>
+            <h5 class="modal-title">{{ $t('files.create.title',{ type: type === 'file' ? $t('files.file') : $t('files.folder') }) }}</h5>
             <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label for="new-name-input" class="form-label">{{ $t('files.name') }}</label>
+              <label for="new-name-input" class="form-label">{{ type === 'file' ? $t('files.new.file.name') : $t('files.new.folder.name') }}</label>
               <input type="text" class="form-control" id="new-name-input" v-model="name" required>
             </div>
           </div>

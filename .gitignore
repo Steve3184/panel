@@ -4,3 +4,4 @@ db/
 uploads_temp/
 workspaces/
 package-lock.json
+src/utils/frpc_*

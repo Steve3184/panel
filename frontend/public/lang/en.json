@@ -60,7 +60,7 @@
     "files.create.folder_failed_toast": "Failed to create folder: {message}",
     "files.create.folder_success_toast": "Folder '{folderName}' created successfully",
     "files.create.name_cannot_be_empty_toast": "Name cannot be empty",
-    "files.create.title": "New...",
+    "files.create.title": "New {type}...",
     "files.cut": "Cut",
     "files.cut.items_success": "Cut {count} items to clipboard",
     "files.delete.bulk_failed_console": "Bulk delete failed",
@@ -568,5 +568,16 @@
     "websocket.connection.lost": "Connection to the server has been lost. Reconnecting...",
     "websocket.error": "WebSocket Error:",
     "websocket.established": "Backend WebSocket connection successful",
-    "websocket.lost": "Backend WebSocket connection lost!"
+    "websocket.lost": "Backend WebSocket connection lost!",
+    "panelSettings.title": "Panel Settings",
+    "panelSettings.panelName": "Panel Name",
+    "panelSettings.panelLogo": "Panel Logo",
+    "panelSettings.enableGradioTunnel": "Enable Gradio Tunnel",
+    "panelSettings.tunnelToken": "Tunnel Token",
+    "panelSettings.generatedGradioTunnelLink": "Generated Gradio Tunnel Link",
+    "panelSettings.panelPort": "Panel Port",
+    "panelSettings.restartPanel": "Restart Panel",
+    "panelSettings.savedSuccess": "Panel settings saved successfully",
+    "panelSettings.savedFailed": "Failed to save panel settings",
+    "panelSettings.restartingPanel": "Panel is restarting, please wait..."
   }
