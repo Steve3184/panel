@@ -132,8 +132,8 @@
               </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="button" class="btn btn-secondary" @click="close">{{ $t('cancel') }}</button>
+            <button type="submit" class="btn btn-primary">{{ $t('instances.save') }}</button>
           </div>
         </form>
       </div>
@@ -336,7 +336,7 @@ const openDeleteConfirm = (deleteData) => {
     deleteTarget.value = {
         deleteData,
         title: t('confirm.delete.title'),
-        message: deleteData ? t('instances.danger.delete_all.confirm') : t('instances.danger.remove_only.confirm')
+        message: deleteData ? t('instances.danger.delete.confirm', { type: form.value.type == 'docker' ? 'Docker' : '' }) : t('instances.danger.delete.remove_only.confirm', { type: form.value.type == 'docker' ? 'Docker' : '' })
     };
     uiStore.openModal('confirmDelete');
 };

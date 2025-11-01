@@ -3,17 +3,17 @@
     <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Editing: <span class="text-info">{{ filePath }}</span></h5>
-          <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
+          <h5 class="modal-title">{{ $t('files.editor.editing') }} <span class="text-info">{{ filePath }}</span></h5>
+          <button type="button" class="btn-close" @click="close" :aria-label="$t('files.editor.close')"></button>
         </div>
         <div class="modal-body p-0">
           <div ref="editorContainerEle" style="height: calc(100vh - 180px);"></div>
         </div>
         <div class="modal-footer">
           <span class="me-auto text-muted">{{ status }}</span>
-          <button type="button" class="btn btn-secondary" @click="close">Close</button>
-          <button type="button" class="btn btn-primary" @click="saveContent(false)" :disabled="isSaving">Save</button>
-           <button type="button" class="btn btn-success" @click="saveContent(true)" :disabled="isSaving">Save & Close</button>
+          <button type="button" class="btn btn-secondary" @click="close">{{ $t('files.editor.close') }}</button>
+          <button type="button" class="btn btn-primary" @click="saveContent(false)" :disabled="isSaving">{{ $t('files.editor.save') }}</button>
+           <button type="button" class="btn btn-success" @click="saveContent(true)" :disabled="isSaving">{{ $t('files.editor.save_and_close') }}</button>
         </div>
       </div>
     </div>
@@ -27,6 +27,7 @@ import * as monaco from 'monaco-editor';
 import { useUiStore } from '../../stores/ui';
 import { useWebSocketStore } from '../../stores/websocket';
 import api from '../../services/api';
+import { useI18n } from '../../composables/useI18n';
 
 const props = defineProps({
   instanceId: { type: String, required: true },
@@ -42,7 +43,8 @@ let editor = null;
 let ws = null;
 let autoSaveTimer = null;
 
-const status = ref('Connecting...');
+const { t } = useI18n();
+const status = ref(t('files.editor.status.connecting'));
 const isSaving = ref(false);
 
 onMounted(() => {
@@ -71,7 +73,7 @@ watch(() => uiStore.modals.fileEditor, async (isVisible) => {
 
 const initializeEditor = async () => {
     if (editor) editor.dispose();
-    status.value = "Loading file...";
+    status.value = t('files.editor.status.loading_file');
 
     try {
         const { content } = await api.getFileContent(props.instanceId, props.filePath);
@@ -81,11 +83,11 @@ const initializeEditor = async () => {
             theme: 'vs-dark',
             automaticLayout: true,
         });
-        status.value = "File loaded.";
+        status.value = t('files.editor.status.file_loaded');
         setupWebSocket();
         setupEditorListeners();
     } catch(error) {
-        status.value = `Error: ${error.message}`;
+        status.value = t('files.editor.status.error', { message: error.message });
         uiStore.showToast(status.value, 'danger');
     }
 };
@@ -113,7 +115,7 @@ const handleKeyDown = (event) => {
 const setupWebSocket = () => {
     ws = websocketStore.getSocket();
     if (!ws) {
-        status.value = "WebSocket not connected.";
+        status.value = t('files.editor.status.ws_not_connected');
         return;
     }
     websocketStore.sendMessage({
@@ -121,13 +123,13 @@ const setupWebSocket = () => {
         instanceId: props.instanceId,
         filePath: props.filePath
     });
-    status.value = "Connected.";
+    status.value = t('files.editor.status.connected');
 };
 
 const saveContent = (closeAfterSave = false) => {
     if (!editor || !ws) return;
     isSaving.value = true;
-    status.value = "Saving...";
+    status.value = t('files.editor.status.saving');
     websocketStore.sendMessage({
         type: 'save-file',
         instanceId: props.instanceId,
@@ -136,7 +138,7 @@ const saveContent = (closeAfterSave = false) => {
         closeEditor: closeAfterSave
     });
     setTimeout(() => {
-        status.value = "Saved.";
+        status.value = t('files.editor.status.saved');
         isSaving.value = false;
         if(closeAfterSave) close();
     }, 1000); // :(

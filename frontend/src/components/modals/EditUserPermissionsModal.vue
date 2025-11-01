@@ -3,33 +3,33 @@
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Edit Permissions for {{ user?.username || 'N/A' }}</h5>
+          <h5 class="modal-title">{{ t('users.perms.edit') }} {{ user?.username || 'N/A' }}</h5>
           <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
         </div>
         <div class="modal-body" v-if="user">
           <div class="mb-3">
-            <label for="edit-permissions-role" class="form-label">Account Type</label>
+            <label for="edit-permissions-role" class="form-label">{{ t('users.account.type') }}</label>
             <select class="form-select" id="edit-permissions-role" :value="user.role" @change="updateRole($event.target.value)" :disabled="isRoleSelectDisabled">
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
+              <option value="user">{{ t('users.role.user') }}</option>
+              <option value="admin">{{ t('users.role.admin') }}</option>
             </select>
           </div>
           <div v-if="user.role === 'user'">
-            <p>Instance Permissions:</p>
+            <p>{{ t('users.perms.edit.instances') }}</p>
             <div class="list-group">
               <div v-for="instance in instancesStore.instances" :key="instance.id" class="list-group-item d-flex justify-content-between align-items-center">
                 <span>{{ instance.name }}</span>
                 <div class="d-flex align-items-center">
                    <div class="form-check form-switch me-3">
                         <input class="form-check-input" type="checkbox" role="switch" :checked="getPermission(instance.id, 'fileManagement')" @change="updatePermission(instance.id, 'fileManagement', $event.target.checked)">
-                        <label class="form-check-label">Files</label>
+                        <label class="form-check-label">{{ t('users.perms.files') }}</label>
                     </div>
                   <select class="form-select w-auto" :value="getPermission(instance.id, 'terminal')" @change="updatePermission(instance.id, 'terminal', $event.target.value)">
-                    <option value="null">None</option>
-                    <option value="read-only">Read-Only</option>
-                    <option value="read-write">Read-Write</option>
-                    <option value="read-write-ops">Read-Write + Ops</option>
-                    <option value="full-control">Full Control</option>
+                    <option value="null">{{ t('users.perms.none') }}</option>
+                    <option value="read-only">{{ t('users.perms.termro') }}</option>
+                    <option value="read-write">{{ t('users.perms.termrw') }}</option>
+                    <option value="read-write-ops">{{ t('users.perms.termrw.ops') }}</option>
+                    <option value="full-control">{{ t('users.perms.fullcontrol') }}</option>
                   </select>
                 </div>
               </div>
@@ -37,7 +37,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="close">Close</button>
+          <button type="button" class="btn btn-secondary" @click="close">{{ t('close') }}</button>
         </div>
       </div>
     </div>
@@ -51,6 +51,9 @@ import { useUiStore } from '../../stores/ui';
 import { useUsersStore } from '../../stores/users';
 import { useInstancesStore } from '../../stores/instances';
 import { useSessionStore } from '../../stores/session';
+import { useI18n } from '../../composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
   user: { type: Object, default: null }

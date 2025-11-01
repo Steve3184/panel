@@ -77,7 +77,7 @@ export const useUiStore = defineStore('ui', () => {
                 ? t('files.progress.extract', { fileName: msg.fileName })
                 : t('files.progress.compress', { outputName: msg.outputName });
             
-            const newToast = reactive({ id, message, type: 'primary', progress: msg.progress }); // 使用 'primary' 类型，通常为蓝色背景白色文字
+            const newToast = reactive({ id, message, type: 'primary', progress: msg.progress });
             toasts.value.push(newToast);
             activeProgressToasts.set(id, newToast);
         } else {
@@ -106,7 +106,6 @@ export const useUiStore = defineStore('ui', () => {
                 : t('files.progress.compress.failed', { outputName: msg.outputName, error: msg.error });
         }
 
-        // Remove the toast after a delay and clear from the map
         setTimeout(() => {
             removeToast(id);
             activeProgressToasts.delete(id);

@@ -78,14 +78,12 @@ app.use((req, res, next) => {
     const users = readDb(USERS_DB_PATH, []);
     // 如果没有用户，并且请求的不是 setup 或 login 页面/API，则重定向到 setup 页面
     if (users.length === 0 &&
-        req.path !== '/setup.html' &&
         req.path !== '/api/setup' &&
-        req.path !== '/login.html' &&
         req.path !== '/api/login' &&
         !req.path.startsWith('/css') &&
         !req.path.startsWith('/js')
     ) {
-        return res.redirect('/setup.html')
+        return res.redirect('/setup')
     }
     next();
 });
@@ -2479,14 +2477,6 @@ const instances = readDb(INSTANCES_DB_PATH, []);
     }
 })();
 
-app.get('/setup.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'setup.html'));
-});
-
-app.get('/login.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
 app.get('*', isAuthenticated, (req, res) => {
     const vueIndexHtmlPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
     if (fs.existsSync(vueIndexHtmlPath)) {
@@ -2503,7 +2493,7 @@ i18n.setLang(lang);
 server.listen(PORT, () => {
     console.log(i18n.t('server.server_running', { port: PORT }));
     if (readDb(USERS_DB_PATH, []).length === 0) {
-        console.log(i18n.t('server.setup_admin_account_warn', { url: `http://localhost:${PORT}/setup.html` }));
+        console.log(i18n.t('server.setup_admin_account_warn', { url: `http://localhost:${PORT}/setup` }));
     }
     initializeInstancesState();
 });

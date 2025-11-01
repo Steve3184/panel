@@ -26,7 +26,7 @@
                             <label for="create-instance-command" class="form-label">{{ $t('instances.command')
                             }}</label>
                             <input type="text" class="form-control" id="create-instance-command" v-model="form.command"
-                                :placeholder="$t('instances.command.placeholder')" :required="form.type === 'shell'">
+                                :placeholder="t('instances.command.placeholder')" :required="form.type === 'shell'">
                         </div>
 
                         <!-- Docker 容器设置 -->
@@ -40,7 +40,7 @@
                                             $t('instances.docker.image') }}</label>
                                         <input type="text" class="form-control" id="create-docker-image"
                                             v-model="form.dockerConfig.image"
-                                            :placeholder="$t('instances.docker.image.placeholder')">
+                                            :placeholder="t('instances.docker.image.placeholder')">
                                     </div>
                                 </div>
                                 <div class="modal-grid-col">
@@ -49,7 +49,7 @@
                                             $t('instances.docker.container') }}</label>
                                         <input type="text" class="form-control" id="create-docker-container-name"
                                             v-model="form.dockerConfig.containerName"
-                                            :placeholder="$t('instances.docker.container.placeholder')">
+                                            :placeholder="t('instances.docker.container.placeholder')">
                                     </div>
                                 </div>
                             </div>
@@ -78,16 +78,16 @@
                                     $t('instances.docker.workdir') }}</label>
                                 <input type="text" class="form-control" id="create-docker-working-dir"
                                     v-model="form.dockerConfig.workingDir"
-                                    :placeholder="$t('instances.docker.workdir.placeholder')">
-                                <div class="form-text">{{ $t('instances.docker.workdir.hint') }}</div>
+                                    :placeholder="t('instances.docker.workdir.placeholder')">
+                                <div class="form-text">{{ t('instances.docker.workdir.hint') }}</div>
                             </div>
                             <div class="mb-3">
                                 <label for="create-docker-command" class="form-label">{{ $t('instances.docker.command')
                                 }}</label>
                                 <input type="text" class="form-control" id="create-docker-command"
                                     v-model="form.dockerConfig.command"
-                                    :placeholder="$t('instances.docker.command.placeholder')">
-                                <div class="form-text">{{ $t('instances.docker.command.hint') }}</div>
+                                    :placeholder="t('instances.docker.command.placeholder')">
+                                <div class="form-text">{{ t('instances.docker.command.hint') }}</div>
                             </div>
                             <hr>
                         </div>
@@ -95,8 +95,8 @@
                         <div class="mb-3">
                             <label for="create-instance-cwd" class="form-label">{{ $t('instances.workdir') }}</label>
                             <input type="text" class="form-control" id="create-instance-cwd" v-model="form.cwd"
-                                :placeholder="$t('instances.workdir.placeholder')">
-                            <div class="form-text">{{ $t('instances.workdir.hint') }}</div>
+                                :placeholder="t('instances.workdir.placeholder')">
+                            <div class="form-text">{{ t('instances.workdir.hint') }}</div>
                         </div>
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" role="switch" id="create-autostart"
@@ -113,8 +113,8 @@
                         <div class="mb-3">
                             <label for="create-instance-env" class="form-label">{{ $t('instances.envvar') }}</label>
                             <textarea class="form-control" id="create-instance-env" rows="3" v-model="form.env"
-                                :placeholder="$t('instances.envvar.placeholder')"></textarea>
-                            <div class="form-text">{{ $t('instances.envvar.hint') }}</div>
+                                :placeholder="t('instances.envvar.placeholder')"></textarea>
+                            <div class="form-text">{{ t('instances.envvar.hint') }}</div>
                         </div>
                     </form>
                 </div>

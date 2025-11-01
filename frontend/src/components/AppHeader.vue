@@ -8,7 +8,7 @@
     </div>
     <div class="dropdown" v-if="sessionStore.currentUser">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-        <span>{{ $t('panel.welcome', { username: sessionStore.currentUser.username }) }}</span>
+        <span>{{ $t('panel.greeting', { username: sessionStore.currentUser.username }) }}</span>
       </button>
       <ul class="dropdown-menu dropdown-menu-end">
         <li>

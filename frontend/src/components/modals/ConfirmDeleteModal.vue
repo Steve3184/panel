@@ -8,12 +8,12 @@
         </div>
         <div class="modal-body">
           <p>{{ message }}</p>
-          <p v-if="itemName">You are about to delete: <strong>{{ itemName }}</strong></p>
-          <p class="text-danger fw-bold">This action is irreversible!</p>
+          <p v-if="itemName">{{ $t('confirm.delete') }} <strong>{{ itemName }}</strong></p>
+          <p class="text-danger fw-bold">{{ $t('confirm.irreversible') }}</p>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-          <button type="button" class="btn btn-danger" @click="handleConfirm">Confirm Delete</button>
+          <button type="button" class="btn btn-secondary" @click="close">{{ $t('cancel') }}</button>
+          <button type="button" class="btn btn-danger" @click="handleConfirm">{{ $t('confirm.delete.btn') }}</button>
         </div>
       </div>
     </div>

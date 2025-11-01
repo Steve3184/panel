@@ -3,16 +3,16 @@
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Upload to {{ fmStore.currentPath || 'Root' }}</h5>
+          <h5 class="modal-title">{{ t('files.upload.title') }} {{ fmStore.currentPath || t('files.root') }}</h5>
           <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div :class="['border border-2 border-dashed rounded p-3 text-center mb-3', { 'border-primary': isDragging }]" @dragenter.prevent="isDragging = true" @dragover.prevent="isDragging = true" @dragleave.prevent="isDragging = false" @drop.prevent="handleDrop">
-            <p class="mb-0 text-muted">Drop files here or click to select</p>
+            <p class="mb-0 text-muted">{{ t('files.upload.hint1') }}</p>
           </div>
           <input class="form-control" type="file" ref="fileInput" @change="handleFileSelect" multiple>
           <div v-if="uploadStatus.fileName" class="mt-3">
-            <p>Uploading: {{ uploadStatus.fileName }}</p>
+            <p>{{ t('files.upload.uploading') }}: {{ uploadStatus.fileName }}</p>
             <div class="progress">
               <div class="progress-bar" role="progressbar" :style="{ width: uploadStatus.progress + '%' }" :aria-valuenow="uploadStatus.progress">{{ uploadStatus.progress.toFixed(0) }}%</div>
             </div>
@@ -20,7 +20,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="close">Done</button>
+          <button type="button" class="btn btn-secondary" @click="close">{{ t('files.upload.done') }}</button>
         </div>
       </div>
     </div>
@@ -32,9 +32,11 @@ import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue';
 import * as bootstrap from 'bootstrap';
 import { useUiStore } from '../../stores/ui';
 import { useFileManagerStore } from '../../stores/fileManager';
+import { useI18n } from '../../composables/useI18n';
 
 const uiStore = useUiStore();
 const fmStore = useFileManagerStore();
+const { t } = useI18n();
 const modalEle = ref(null);
 const fileInput = ref(null);
 let modal = null;
@@ -79,7 +81,7 @@ const startUpload = async (file) => {
 
     uploadStatus.fileName = file.name;
     uploadStatus.progress = 0;
-    uploadStatus.message = 'Initializing upload...';
+    uploadStatus.message = t('files.upload.initializing_status');
 
     const chunkSize = 1 * 1024 * 1024;
     let offset = 0;
@@ -105,7 +107,7 @@ const startUpload = async (file) => {
             
             offset += chunk.size;
             uploadStatus.progress = (offset / file.size) * 100;
-            uploadStatus.message = `Uploaded ${Math.round(offset / 1024)} KB of ${Math.round(file.size / 1024)} KB`;
+            uploadStatus.message = t('files.upload.uploading_status', { uploaded: Math.round(offset / 1024), total: Math.round(file.size / 1024) });
         }
 
         await fetch(`/api/instances/${fmStore.currentInstanceId}/upload/complete`, {
@@ -114,10 +116,10 @@ const startUpload = async (file) => {
             body: JSON.stringify({ uploadId, fileName: file.name, destinationPath: fmStore.currentPath })
         });
 
-        uploadStatus.message = 'Upload complete!';
+        uploadStatus.message = t('files.upload.complete');
         fmStore.loadFiles(fmStore.currentPath); // Refresh file list
     } catch (error) {
-        uploadStatus.message = `Error: ${error.message}`;
+        uploadStatus.message = `${t('error.title')}: ${error.message}`;
         uiStore.showToast(uploadStatus.message, 'danger');
     } finally {
         fileInput.value.value = ''; // Reset file input

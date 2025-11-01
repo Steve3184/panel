@@ -2,17 +2,17 @@
   <div class="d-flex align-items-center py-4 bg-body-tertiary vh-100">
     <main class="form-signin w-100 m-auto">
       <form @submit.prevent="handleSetup">
-        <h1 class="h3 mb-3 fw-normal">First-time Setup</h1>
-        <p class="mb-3">Welcome! Please create an administrator account to begin.</p>
+        <h1 class="h3 mb-3 fw-normal">{{ $t('setup.heading') }}</h1>
+        <p class="mb-3">{{ $t('setup.welcome') }}</p>
         <div class="form-floating">
-          <input type="text" class="form-control" id="username" placeholder="admin" v-model="form.username" required>
-          <label for="username">Username</label>
+          <input type="text" class="form-control" id="username" :placeholder="$t('setup.username.placeholder')" v-model="form.username" required>
+          <label for="username">{{ $t('setup.username') }}</label>
         </div>
         <div class="form-floating mt-2">
-          <input type="password" class="form-control" id="password" placeholder="Password" v-model="form.password" required>
-          <label for="password">Password</label>
+          <input type="password" class="form-control" id="password" :placeholder="$t('setup.password.placeholder')" v-model="form.password" required>
+          <label for="password">{{ $t('setup.password') }}</label>
         </div>
-        <button class="btn btn-primary w-100 py-2 mt-3" type="submit">Create Administrator</button>
+        <button class="btn btn-primary w-100 py-2 mt-3" type="submit">{{ $t('setup.create') }}</button>
         <div v-if="error" class="alert alert-danger mt-3">{{ error }}</div>
       </form>
     </main>
@@ -34,15 +34,15 @@ const error = ref(null);
 async function handleSetup() {
   error.value = null;
   if (!form.password) {
-      error.value = "Password cannot be empty.";
+      error.value = $t('error.password_empty');
       return;
   }
   try {
     await api.setup(form);
-    alert('Admin account created successfully! Please log in.');
+    alert($t('success.admin_account_created'));
     router.push('/login');
   } catch (err) {
-    error.value = err.message || 'An unknown error occurred during setup.';
+    error.value = err.message || $t('error.unknown_setup_error');
   }
 }
 </script>

@@ -2,9 +2,11 @@ import { defineStore } from 'pinia';
 import { ref, reactive } from 'vue';
 import api from '../services/api';
 import { useUiStore } from './ui';
+import { useI18n } from '../composables/useI18n';
 
 export const useFileManagerStore = defineStore('fileManager', () => {
     const uiStore = useUiStore();
+    const { t } = useI18n();
 
     const currentInstanceId = ref(null);
     const currentPath = ref('');
@@ -34,7 +36,7 @@ export const useFileManagerStore = defineStore('fileManager', () => {
                 return a.name.localeCompare(b.name);
             });
         } catch (error) {
-            uiStore.showToast(`Failed to load files: ${error.message}`, 'danger');
+            uiStore.showToast(t('files.load.failed_toast', { message: t(error.message) }), 'danger');
             // Reset to instance selection on error
             currentInstanceId.value = null;
         } finally {
@@ -55,7 +57,7 @@ export const useFileManagerStore = defineStore('fileManager', () => {
     async function performOperation(operation, ...args) {
         try {
             await api[operation](currentInstanceId.value, ...args);
-            uiStore.showToast(`Operation '${operation}' successful.`, 'success');
+            uiStore.showToast(t('files.operation.success', { operation: operation }), 'success');
             await loadFiles(currentPath.value);
             // Clear selections and clipboard after move/cut
             if (operation === 'move') {
@@ -64,7 +66,7 @@ export const useFileManagerStore = defineStore('fileManager', () => {
             }
             selectedFiles.clear();
         } catch (error) {
-            uiStore.showToast(`Operation '${operation}' failed: ${error.message}`, 'danger');
+            uiStore.showToast(t('files.operation.failed', { operation: operation, message: t(error.message) }), 'danger');
         }
     }
 

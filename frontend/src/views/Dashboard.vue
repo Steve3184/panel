@@ -18,7 +18,7 @@
 
         <!-- Instance List Actions -->
         <div class="d-flex mb-3">
-          <input type="text" class="form-control me-2" v-model="searchTerm" placeholder="Search instances...">
+          <input type="text" class="form-control me-2" v-model="searchTerm" :placeholder="$t('instances.search.placeholder')">
           <button v-if="sessionStore.currentUser?.role === 'admin'" class="btn btn-primary flex-shrink-0" @click="uiStore.openModal('createInstance')">
             <i class="bi bi-plus-lg me-2"></i><span>{{ $t('instances.create') }}</span>
           </button>
@@ -40,7 +40,7 @@
                             <small class="text-muted"><code>{{ instance.type === 'docker' ? instance.dockerConfig?.image || instance.command : instance.command }}</code></small>
                         </div>
                         <div class="btn-group">
-                            <router-link :to="`/instance/${instance.id}`" class="btn btn-sm btn-outline-primary">Open</router-link>
+                            <router-link :to="`/instance/${instance.id}`" class="btn btn-sm btn-outline-primary">{{ $t('open') }}</router-link>
                              <button v-if="canManage(instance)" class="btn btn-sm btn-outline-secondary" @click="openSettings(instance)">
                                 <i class="bi bi-gear"></i>
                             </button>
@@ -48,7 +48,7 @@
                     </div>
                 </div>
             </div>
-             <p v-if="filteredInstances.length === 0" class="text-muted">No instances found.</p>
+             <p v-if="filteredInstances.length === 0" class="text-muted">{{ $t('instances.no_instances_found') }}</p>
         </div>
       </div>
     </main>

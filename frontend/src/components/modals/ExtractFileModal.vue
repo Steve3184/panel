@@ -4,22 +4,22 @@
       <div class="modal-content">
         <form @submit.prevent="handleSubmit">
           <div class="modal-header">
-            <h5 class="modal-title">Extract File</h5>
+            <h5 class="modal-title">{{ t('files.extract.title') }}</h5>
             <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label class="form-label">File to Extract</label>
+              <label class="form-label">{{ t('files.extract.file_to_extract') }}</label>
               <input type="text" class="form-control" :value="file?.name" readonly>
             </div>
             <div class="mb-3">
-              <label for="extract-destination-path" class="form-label">Destination (relative to current folder)</label>
-              <input type="text" class="form-control" id="extract-destination-path" v-model="destinationPath" placeholder="Leave blank for current folder">
+              <label for="extract-destination-path" class="form-label">{{ t('files.extract.to') }}</label>
+              <input type="text" class="form-control" id="extract-destination-path" v-model="destinationPath" :placeholder="t('files.extract.to.hint')">
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-            <button type="submit" class="btn btn-primary">Extract</button>
+            <button type="button" class="btn btn-secondary" @click="close">{{ t('cancel') }}</button>
+            <button type="submit" class="btn btn-primary">{{ t('files.action.extract') }}</button>
           </div>
         </form>
       </div>
@@ -32,6 +32,9 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import * as bootstrap from 'bootstrap';
 import { useUiStore } from '../../stores/ui';
 import { useFileManagerStore } from '../../stores/fileManager';
+import { useI18n } from '../../composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
   file: { type: Object, default: null }

@@ -10,16 +10,16 @@
           <div class="mb-3">
             <label for="language-select" class="form-label">{{ $t('panel.select_language') }}</label>
             <select class="form-select" id="language-select" v-model="selectedLang">
-              <option value="auto">Auto-detect</option>
-              <option value="en">English</option>
-              <option value="zh_CN">简体中文</option>
-              <option value="jp">日本語</option>
+              <option value="auto">{{ $t('language.auto') }}</option>
+              <option value="en">{{ $t('language.en') }}</option>
+              <option value="zh_CN">{{ $t('language.zh_CN') }}</option>
+              <option value="jp">{{ $t('language.jp') }}</option>
             </select>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-          <button type="button" class="btn btn-primary" @click="saveLanguage">Save</button>
+          <button type="button" class="btn btn-secondary" @click="close">{{ $t('cancel') }}</button>
+          <button type="button" class="btn btn-primary" @click="saveLanguage">{{ $t('save') }}</button>
         </div>
       </div>
     </div>

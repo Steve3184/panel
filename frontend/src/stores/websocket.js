@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { useInstancesStore } from './instances';
 import { useFileManagerStore } from './fileManager';
 import { useUiStore } from './ui';
+import { useI18n } from '../composables/useI18n';
 
 let socket = null;
 let reconnectInterval = null;
@@ -10,6 +11,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     const instancesStore = useInstancesStore();
     const fileManagerStore = useFileManagerStore();
     const uiStore = useUiStore();
+    const { t } = useI18n();
 
     function connect() {
         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -20,7 +22,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
         socket = new WebSocket(`${protocol}${location.host}/ws`);
 
         socket.onopen = () => {
-            console.log('WebSocket connection established.');
+            console.log(t('websocket.connection.established'));
             if (reconnectInterval) {
                 clearInterval(reconnectInterval);
                 reconnectInterval = null;
@@ -65,8 +67,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
         };
 
         socket.onclose = () => {
-            console.log('WebSocket connection closed.');
-            uiStore.showToast('Connection to server lost. Reconnecting...', 'danger');
+            console.log(t('websocket.connection.closed'));
+            uiStore.showToast(t('websocket.connection.lost'), 'danger');
             socket = null;
             if (!reconnectInterval) {
                 reconnectInterval = setInterval(() => {
@@ -76,7 +78,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
         };
 
         socket.onerror = (error) => {
-            console.error('WebSocket error:', error);
+            console.error(t('websocket.error'), error);
         };
     }
 

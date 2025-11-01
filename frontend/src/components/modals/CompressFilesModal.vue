@@ -4,16 +4,16 @@
       <div class="modal-content">
         <form @submit.prevent="handleSubmit">
           <div class="modal-header">
-            <h5 class="modal-title">Compress {{ fmStore.selectedFiles.size }} Items</h5>
+            <h5 class="modal-title">{{ $t('files.compress.title') }} {{ fmStore.selectedFiles.size }} {{ $t('files.items') }}</h5>
             <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label for="compress-output-name" class="form-label">Archive Name</label>
+              <label for="compress-output-name" class="form-label">{{ $t('files.filename') }}</label>
               <input type="text" class="form-control" id="compress-output-name" v-model="form.outputName" required>
             </div>
             <div class="mb-3">
-              <label for="compress-format" class="form-label">Format</label>
+              <label for="compress-format" class="form-label">{{ $t('files.compress.format') }}</label>
               <select class="form-select" id="compress-format" v-model="form.format">
                 <option value="zip">zip</option>
                 <option value="7z">7z</option>
@@ -22,13 +22,13 @@
               </select>
             </div>
             <div class="mb-3">
-              <label for="compress-level-slider" class="form-label">Compression Level: {{ form.level }}</label>
+              <label for="compress-level-slider" class="form-label">{{ $t('files.compress.ratio') }} {{ form.level }}</label>
               <input type="range" class="form-range" id="compress-level-slider" min="0" max="9" v-model="form.level">
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-            <button type="submit" class="btn btn-primary">Compress</button>
+            <button type="button" class="btn btn-secondary" @click="close">{{ $t('cancel') }}</button>
+            <button type="submit" class="btn btn-primary">{{ $t('files.compress') }}</button>
           </div>
         </form>
       </div>

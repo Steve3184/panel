@@ -4,18 +4,18 @@
       <div class="modal-content">
         <form @submit.prevent="handleSubmit">
           <div class="modal-header">
-            <h5 class="modal-title">Rename</h5>
+            <h5 class="modal-title">{{ $t('files.action.rename') }}</h5>
             <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label for="rename-new-name" class="form-label">New Name</label>
+              <label for="rename-new-name" class="form-label">{{ $t('files.rename.new') }}</label>
               <input type="text" class="form-control" id="rename-new-name" v-model="newName" required>
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-            <button type="submit" class="btn btn-primary">Rename</button>
+            <button type="button" class="btn btn-secondary" @click="close">{{ $t('cancel') }}</button>
+            <button type="submit" class="btn btn-primary">{{ $t('files.action.rename') }}</button>
           </div>
         </form>
       </div>
@@ -46,6 +46,7 @@ onMounted(() => {
   });
   // Initial display based on uiStore.modals.renameFile
   if (uiStore.modals.renameFile) {
+    newName.value = props.file.name;
     modal.show();
   }
 });

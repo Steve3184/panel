@@ -3,22 +3,22 @@
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Port Forwarding Settings</h5>
+          <h5 class="modal-title">{{ $t('instances.docker.ports.title') }}</h5>
           <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="d-flex justify-content-end mb-3">
             <button type="button" class="btn btn-sm btn-outline-primary" @click="addPort">
-              <i class="bi bi-plus-lg me-2"></i> Add Port
+              <i class="bi bi-plus-lg me-2"></i> {{ $t('instances.docker.ports.add') }}
             </button>
           </div>
           <div v-for="(port, index) in localPorts" :key="index" class="input-group mb-2">
-            <input type="number" class="form-control" placeholder="Host Port" v-model.number="port.hostPort">
+            <input type="number" class="form-control" :placeholder="$t('instances.docker.ports.host_port')" v-model.number="port.hostPort">
             <span class="input-group-text">:</span>
-            <input type="number" class="form-control" placeholder="Container Port" v-model.number="port.containerPort">
+            <input type="number" class="form-control" :placeholder="$t('instances.docker.ports.container_port')" v-model.number="port.containerPort">
             <select class="form-select" v-model="port.protocol">
-              <option value="tcp">TCP</option>
-              <option value="udp">UDP</option>
+              <option value="tcp">{{ $t('instances.docker.ports.protocol.tcp') }}</option>
+              <option value="udp">{{ $t('instances.docker.ports.protocol.udp') }}</option>
             </select>
             <button class="btn btn-outline-danger" type="button" @click="removePort(index)">
               <i class="bi bi-trash"></i>
@@ -26,8 +26,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-          <button type="button" class="btn btn-primary" @click="save">Save Ports</button>
+          <button type="button" class="btn btn-secondary" @click="close">{{ $t('cancel') }}</button>
+          <button type="button" class="btn btn-primary" @click="save">{{ $t('instances.docker.ports.save') }}</button>
         </div>
       </div>
     </div>

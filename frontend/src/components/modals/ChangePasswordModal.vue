@@ -4,26 +4,26 @@
       <div class="modal-content">
         <form @submit.prevent="handleSubmit">
           <div class="modal-header">
-            <h5 class="modal-title">Change Password for {{ user?.username || 'N/A' }}</h5>
+            <h5 class="modal-title">{{ $t('users.change_password.title') }} {{ user?.username || 'N/A' }}</h5>
             <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div v-if="isCurrentUser" class="mb-3">
-              <label for="old-password" class="form-label">Old Password</label>
+              <label for="old-password" class="form-label">{{ $t('users.change_password.old') }}</label>
               <input type="password" class="form-control" id="old-password" v-model="form.oldPassword" required>
             </div>
             <div class="mb-3">
-              <label for="new-password" class="form-label">New Password</label>
+              <label for="new-password" class="form-label">{{ $t('users.change_password.new') }}</label>
               <input type="password" class="form-control" id="new-password" v-model="form.newPassword" required>
             </div>
             <div class="mb-3">
-              <label for="confirm-new-password" class="form-label">Confirm New Password</label>
+              <label for="confirm-new-password" class="form-label">{{ $t('users.change_password.new.confirm') }}</label>
               <input type="password" class="form-control" id="confirm-new-password" v-model="form.confirmPassword" required>
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="button" class="btn btn-secondary" @click="close">{{ $t('cancel') }}</button>
+            <button type="submit" class="btn btn-primary">{{ $t('save') }}</button>
           </div>
         </form>
       </div>
@@ -89,7 +89,7 @@ const close = () => uiStore.closeModal('changePassword');
 
 const handleSubmit = () => {
   if (form.value.newPassword !== form.value.confirmPassword) {
-    uiStore.showToast('New passwords do not match.', 'danger');
+    uiStore.showToast(i18n.t('error.password_mismatch'), 'danger');
     return;
   }
   const payload = { newPassword: form.value.newPassword };

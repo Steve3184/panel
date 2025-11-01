@@ -3,12 +3,14 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../services/api';
 import { useUiStore } from './ui';
+import { useWebSocketStore } from './websocket';
 
 export const useSessionStore = defineStore('session', () => {
     const router = useRouter();
     const uiStore = useUiStore();
     const currentUser = ref(null);
     const isAuthenticated = ref(false);
+    const websocketStore = useWebSocketStore();
 
     async function checkSession() {
         try {
@@ -19,7 +21,6 @@ export const useSessionStore = defineStore('session', () => {
         } catch (error) {
             currentUser.value = null;
             isAuthenticated.value = false;
-            // 如果不在登录或设置页面，则重定向
             if (router.currentRoute.value.name !== 'Login' && router.currentRoute.value.name !== 'Setup') {
                  router.push('/login');
             }
@@ -31,6 +32,7 @@ export const useSessionStore = defineStore('session', () => {
         try {
             await api.login(credentials);
             await checkSession();
+            websocketStore.connect();
             router.push('/');
         } catch (error) {
             uiStore.showToast(error.message, 'danger');

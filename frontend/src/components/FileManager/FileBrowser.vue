@@ -11,7 +11,7 @@
       />
       <div v-if="fmStore.isLoading" class="text-center p-5">
         <div class="spinner-border" role="status">
-          <span class="visually-hidden">Loading...</span>
+          <span class="visually-hidden">{{ t('loading') }}</span>
         </div>
       </div>
       <div v-else class="card" id="file-browser">
@@ -21,16 +21,16 @@
               <thead>
                 <tr>
                   <th style="width: 30px;"><input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll"></th>
-                  <th>Name</th>
-                  <th class="d-none d-md-table-cell">Size</th>
-                  <th class="d-none d-md-table-cell">Modified</th>
-                  <th>Actions</th>
+                  <th>{{ t('files.table.name') }}</th>
+                  <th class="d-none d-md-table-cell">{{ t('files.table.size') }}</th>
+                  <th class="d-none d-md-table-cell">{{ t('files.table.modified') }}</th>
+                  <th>{{ t('files.table.actions') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="fmStore.currentPath" @dblclick="goUp" class="file-row">
                     <td></td>
-                    <td><i class="bi bi-folder-fill ms-1 me-2 text-warning"></i> ..</td>
+                    <td><i class="bi bi-folder-fill ms-1 me-2 text-warning"></i> {{ t('files.go_up') }}</td>
                     <td colspan="2"></td>
                 </tr>
                 <tr v-for="file in filteredFiles" :key="file.path" @dblclick="navigate(file)" class="file-row">
@@ -39,25 +39,25 @@
                     <td class="d-none d-md-table-cell">{{ file.isDirectory ? '' : formatBytes(file.size) }}</td>
                     <td class="d-none d-md-table-cell">{{ new Date(file.mtime).toLocaleString() }}</td>
                     <td class="file-actions">
-                         <button v-if="!file.isDirectory" class="btn btn-sm btn-primary me-2" @click.stop="downloadFile(file)" title="Download">
+                         <button v-if="!file.isDirectory" class="btn btn-sm btn-primary me-2" @click.stop="downloadFile(file)" :title="t('files.action.download.title')">
                             <i class="bi bi-download"></i>
                          </button>
-                         <button v-if="isExtractable(file)" class="btn btn-sm btn-secondary me-2" @click.stop="openExtract(file)" title="Extract">
+                         <button v-if="isExtractable(file)" class="btn btn-sm btn-secondary me-2" @click.stop="openExtract(file)" :title="t('files.action.extract.title')">
                             <i class="bi bi-box-arrow-in-down-right"></i>
                          </button>
-                         <button v-if="isEditable(file)" class="btn btn-sm btn-info me-2" @click.stop="openEditor(file)" title="Edit">
+                         <button v-if="isEditable(file)" class="btn btn-sm btn-info me-2" @click.stop="openEditor(file)" :title="t('files.action.edit.title')">
                             <i class="bi bi-pencil-square"></i>
                          </button>
-                         <button class="btn btn-sm btn-warning me-2" @click.stop="openRename(file)" title="Rename">
+                           <button class="btn btn-sm btn-warning me-2" @click.stop="openRename(file)" :title="t('files.action.rename.title')">
                             <i class="bi bi-pencil"></i>
                          </button>
-                           <button class="btn btn-sm btn-danger me-2" @click.stop="openDelete(file)" title="Delete">
+                           <button class="btn btn-sm btn-danger me-2" @click.stop="openDelete(file)" :title="t('files.action.delete.title')">
                             <i class="bi bi-trash"></i>
                          </button>
                     </td>
                 </tr>
                 <tr v-if="filteredFiles.length === 0 && !fmStore.currentPath">
-                    <td colspan="6" class="text-center text-muted p-4">This directory is empty.</td>
+                    <td colspan="6" class="text-center text-muted p-4">{{ t('files.directory_empty') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -95,9 +95,11 @@ import ExtractFileModal from '../modals/ExtractFileModal.vue';
 import CompressFilesModal from '../modals/CompressFilesModal.vue';
 import UploadFileModal from '../modals/UploadFileModal.vue';
 import FileEditorModal from '../modals/FileEditorModal.vue';
+import { useI18n } from '../../composables/useI18n';
 
 const fmStore = useFileManagerStore();
 const uiStore = useUiStore();
+const { t } = useI18n();
 
 const searchQuery = ref('');
 const newType = ref('file');
@@ -153,9 +155,9 @@ const getFileIcon = (file) => {
     return 'bi bi-file-earmark';
 };
 const formatBytes = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return `0 ${t('files.size.bytes')}`;
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = [t('files.size.bytes'), t('files.size.kb'), t('files.size.mb'), t('files.size.gb'), t('files.size.tb')];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
@@ -189,10 +191,10 @@ const openEditor = (file) => {
 };
 
 const openDelete = (file) => {
-    deleteTarget.value = { 
+    deleteTarget.value = {
         type: 'single',
-        title: 'Confirm File Deletion',
-        message: 'Are you sure you want to permanently delete this file?',
+        title: t('files.delete.confirm.title'),
+        message: t('files.delete.confirm.message'),
         name: file.name,
         path: file.path
     };
@@ -202,8 +204,8 @@ const openDelete = (file) => {
 const openDeleteSelectedConfirm = () => {
     deleteTarget.value = {
         type: 'multiple',
-        title: 'Confirm Multiple Deletions',
-        message: `Are you sure you want to permanently delete these ${fmStore.selectedFiles.size} items?`,
+        title: t('files.delete.confirm.multiple.title'),
+        message: t('files.delete.confirm.multiple.message', { count: fmStore.selectedFiles.size }),
         name: '',
         paths: Array.from(fmStore.selectedFiles)
     };

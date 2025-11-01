@@ -4,18 +4,18 @@
       <div class="modal-content">
         <form @submit.prevent="handleSubmit">
           <div class="modal-header">
-            <h5 class="modal-title">Edit Username</h5>
+            <h5 class="modal-title">{{ t('users.change_username.title') }}</h5>
             <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label for="edit-username-input" class="form-label">New Username</label>
+              <label for="edit-username-input" class="form-label">{{ t('users.change_username.new') }}</label>
               <input type="text" class="form-control" id="edit-username-input" v-model="newUsername" required>
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" class="btn btn-secondary" @click="close">{{ t('cancel') }}</button>
+            <button type="submit" class="btn btn-primary">{{ t('save') }}</button>
           </div>
         </form>
       </div>
@@ -28,6 +28,9 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import * as bootstrap from 'bootstrap';
 import { useUiStore } from '../../stores/ui';
 import { useUsersStore } from '../../stores/users';
+import { useI18n } from '../../composables/useI18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
   user: { type: Object, default: null }
@@ -44,6 +47,7 @@ onMounted(() => {
   modal = new bootstrap.Modal(modalEle.value);
   // Initial display based on uiStore.modals.editUsername
   if (uiStore.modals.editUsername) {
+    newUsername.value = props.user.username || '';
     modal.show();
   }
 

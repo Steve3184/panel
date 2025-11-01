@@ -2,12 +2,12 @@
   <div class="d-flex">
     <Sidebar />
     <main id="main-content">
-      <AppHeader page-title="User Management" />
+      <AppHeader :page-title="$t('title.users')" />
 
       <!-- User Management Page -->
       <div id="users-page">
         <div class="d-flex justify-content-between align-items-center pb-2 mb-3 border-bottom">
-          <input type="text" class="form-control me-2" v-model="searchTerm" placeholder="Search users..." style="max-width: 300px;">
+          <input type="text" class="form-control me-2" v-model="searchTerm" :placeholder="$t('users.search.placeholder')" style="max-width: 300px;">
           <button class="btn btn-primary" @click="uiStore.openModal('createUser')">
             <i class="bi bi-person-plus-fill"></i>
           </button>
@@ -19,9 +19,9 @@
               <table class="table table-hover">
                 <thead>
                   <tr>
-                    <th>Username</th>
-                    <th>Role</th>
-                    <th></th>
+                    <th>{{ $t('users.username') }}</th>
+                    <th>{{ $t('users.role') }}</th>
+                    <th>{{ $t('users.actions') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -35,18 +35,18 @@
                     <td>{{ user.role }}</td>
                     <td class="text-end">
                       <button class="btn btn-sm btn-warning me-2" @click="openChangePassword(user)">
-                        <i class="bi bi-key me-1"></i> Change Password
+                        <i class="bi bi-key me-1"></i> {{ $t('users.change_password') }}
                       </button>
                       <button class="btn btn-sm btn-info me-2" @click="openPermissions(user)">
-                        <i class="bi bi-shield-lock me-1"></i> Permissions
+                        <i class="bi bi-shield-lock me-1"></i> {{ $t('users.edit_permissions') }}
                       </button>
                       <button class="btn btn-sm btn-danger" @click="openDeleteConfirm(user)" :disabled="sessionStore.currentUser.id === user.id">
-                        <i class="bi bi-trash me-1"></i> Delete
+                        <i class="bi bi-trash me-1"></i> {{ $t('users.delete') }}
                       </button>
                     </td>
                   </tr>
                   <tr v-if="filteredUsers.length === 0">
-                    <td colspan="3" class="text-center text-muted">No users found.</td>
+                    <td colspan="3" class="text-center text-muted">{{ $t('users.no_users_found') }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -63,8 +63,8 @@
   <EditUsernameModal v-if="uiStore.modals.editUsername" :user="selectedUser" />
   <ConfirmDeleteModal v-if="uiStore.modals.confirmDelete"
     :item-name="selectedUser?.username"
-    title="Confirm User Deletion"
-    message="Are you sure you want to delete this user? This action is irreversible and will remove all their permissions."
+    :title="$t('users.delete.title')"
+    :message="$t('users.delete.irreversible')"
     @confirm="confirmDelete"
   />
 

@@ -4,18 +4,18 @@
       <div class="modal-content">
         <form @submit.prevent="handleSubmit">
           <div class="modal-header">
-            <h5 class="modal-title">Create New {{ type === 'file' ? 'File' : 'Folder' }}</h5>
+            <h5 class="modal-title">{{ $t('files.create.title') }} {{ type === 'file' ? $t('files.file') : $t('files.folder') }}</h5>
             <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label for="new-name-input" class="form-label">Name</label>
+              <label for="new-name-input" class="form-label">{{ $t('files.name') }}</label>
               <input type="text" class="form-control" id="new-name-input" v-model="name" required>
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-            <button type="submit" class="btn btn-primary">Create</button>
+            <button type="button" class="btn btn-secondary" @click="close">{{ $t('cancel') }}</button>
+            <button type="submit" class="btn btn-primary">{{ $t('files.create') }}</button>
           </div>
         </form>
       </div>

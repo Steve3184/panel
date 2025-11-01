@@ -3,23 +3,23 @@
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Volume Mounting Settings</h5>
+          <h5 class="modal-title">{{ t('instances.docker.volumes.title') }}</h5>
           <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="d-flex justify-content-end mb-3">
             <button type="button" class="btn btn-sm btn-outline-primary" @click="addVolume">
-              <i class="bi bi-plus-lg me-2"></i> Add Volume
+              <i class="bi bi-plus-lg me-2"></i> {{ t('instances.docker.volumes.add') }}
             </button>
           </div>
           <div v-for="(volume, index) in localVolumes" :key="index" class="input-group mb-2">
-            <input type="text" class="form-control" placeholder="Host Path" v-model="volume.source">
+            <input type="text" class="form-control" :placeholder="t('instances.docker.volumes.host_path')" v-model="volume.source">
             <span class="input-group-text">:</span>
-            <input type="text" class="form-control" placeholder="Container Path" v-model="volume.destination">
+            <input type="text" class="form-control" :placeholder="t('instances.docker.volumes.container_path')" v-model="volume.destination">
             <div class="input-group-text">
               <div class="form-check form-switch m-0">
                 <input class="form-check-input" type="checkbox" v-model="volume.readOnly">
-                <label class="form-check-label small">RO</label>
+                <label class="form-check-label small">{{ t('instances.docker.volumes.ro') }}</label>
               </div>
             </div>
             <button class="btn btn-outline-danger" type="button" @click="removeVolume(index)">
@@ -28,8 +28,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-          <button type="button" class="btn btn-primary" @click="save">Save Volumes</button>
+          <button type="button" class="btn btn-secondary" @click="close">{{ t('cancel') }}</button>
+          <button type="button" class="btn btn-primary" @click="save">{{ t('instances.docker.volumes.save') }}</button>
         </div>
       </div>
     </div>
@@ -40,6 +40,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import * as bootstrap from 'bootstrap';
 import { useUiStore } from '../../stores/ui';
+import { useI18n } from '../../composables/useI18n';
 
 const props = defineProps({
   volumes: { type: Array, default: () => [] }
@@ -47,6 +48,7 @@ const props = defineProps({
 const emit = defineEmits(['update:volumes']);
 
 const uiStore = useUiStore();
+const { t } = useI18n();
 const modalEle = ref(null);
 let modal = null;
 const localVolumes = ref([]);
