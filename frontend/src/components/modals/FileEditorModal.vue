@@ -114,6 +114,16 @@ const handleKeyDown = (event) => {
   }
 };
 
+const handleFileSavedNotification = (message) => {
+  if (message.filePath === props.filePath) {
+    status.value = t('files.editor.status.saved');
+    isSaving.value = false;
+    if (message.closeEditor) {
+      close();
+    }
+  }
+};
+
 const setupWebSocket = () => {
   ws = websocketStore.getSocket();
   if (!ws) {
@@ -125,15 +135,8 @@ const setupWebSocket = () => {
     instanceId: props.instanceId,
     filePath: props.filePath
   });
-  websocketStore.onMessage((message) => {
-    if (message.type === 'file-saved-notification' && message.filePath === props.filePath) {
-      status.value = t('files.editor.status.saved');
-      isSaving.value = false;
-      if (message.closeEditor) {
-        close();
-      }
-    }
-  });
+
+  websocketStore.onMessage('file-saved-notification', handleFileSavedNotification);
   status.value = t('files.editor.status.connected');
 };
 
@@ -174,6 +177,7 @@ const cleanup = () => {
   if (ws) {
     websocketStore.sendMessage({ type: 'unsubscribe-file-edit', instanceId: props.instanceId, filePath: props.filePath });
   }
+  websocketStore.offMessage('file-saved-notification', handleFileSavedNotification);
   clearTimeout(autoSaveTimer);
   window.removeEventListener('keydown', handleKeyDown);
   editor?.dispose();

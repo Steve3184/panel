@@ -6,6 +6,7 @@ import { useI18n } from '../composables/useI18n';
 
 let socket = null;
 let reconnectInterval = null;
+const messageHandlers = new Map(); // 用于存储消息处理器的 Map
 
 export const useWebSocketStore = defineStore('websocket', () => {
     const instancesStore = useInstancesStore();
@@ -47,7 +48,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
                 case 'output':
                 case 'file-content-updated':
                 case 'file-saved-notification':
-                    // These are handled by component-level event listeners
+                    // 遍历并调用注册的处理器
+                    if (messageHandlers.has(msg.type)) {
+                        messageHandlers.get(msg.type).forEach(handler => handler(msg));
+                    }
                     break;
                 // File manager progress/status
                 case 'file-change':
@@ -113,5 +117,20 @@ export const useWebSocketStore = defineStore('websocket', () => {
         return socket;
     }
 
-    return { connect, sendMessage, getSocket };
+    // 注册消息处理器
+    function onMessage(type, handler) {
+        if (!messageHandlers.has(type)) {
+            messageHandlers.set(type, new Set());
+        }
+        messageHandlers.get(type).add(handler);
+    }
+
+    // 注销消息处理器
+    function offMessage(type, handler) {
+        if (messageHandlers.has(type)) {
+            messageHandlers.get(type).delete(handler);
+        }
+    }
+
+    return { connect, sendMessage, getSocket, onMessage, offMessage };
 });
