@@ -3,7 +3,7 @@
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4 class="mb-0">
-                <img v-if="uiStore.panelLogo != undefined" :src="uiStore.panelLogo" alt="Panel Logo" class="sidebar-logo me-2" />
+                <img v-if="uiStore.panelLogo != ''" :src="uiStore.panelLogo" alt="Logo" class="sidebar-logo me-2" />
                 <i v-else class="bi bi-server me-2"></i>
                 <span>{{ t('panel.name') }}</span>
             </h4>
@@ -14,13 +14,11 @@
         <!-- Main Nav -->
         <ul class="nav flex-column">
             <li class="nav-item">
-                <!-- 修改为 router-link -->
                 <router-link to="/" class="nav-link" active-class="active">
                     <i class="bi bi-grid-1x2-fill me-2"></i><span>{{ t('title.overview') }}</span>
                 </router-link>
             </li>
             <li class="nav-item">
-                 <!-- 修改为 router-link -->
                  <router-link to="/files" class="nav-link" active-class="active">
                     <i class="bi bi-folder-fill me-2"></i><span>{{ t('title.files') }}</span>
                 </router-link>
