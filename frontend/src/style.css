@@ -1,7 +1,9 @@
-/* 通用与认证页面 */
-html, body {
-    height: 100%; /* Ensure html and body take full height */
-    overflow: hidden; /* Prevent horizontal scroll */
+html,
+body {
+    height: 100%;
+    /* Ensure html and body take full height */
+    overflow: hidden;
+    /* Prevent horizontal scroll */
 }
 
 body {
@@ -13,7 +15,6 @@ body {
     padding: 1rem;
 }
 
-/* 仪表盘 */
 .d-flex {
     align-items: stretch;
 }
@@ -24,8 +25,12 @@ body {
     color: white;
     transition: margin-left 0.3s ease;
     flex-shrink: 0;
-    display: flex; /* Enable flexbox for vertical alignment */
-    flex-direction: column; /* Stack sidebar content vertically */
+    display: flex;
+    /* Enable flexbox for vertical alignment */
+    flex-direction: column;
+    /* Stack sidebar content vertically */
+    height: 100vh; /* Make sidebar take full viewport height */
+    overflow-y: auto; /* Enable scrolling for the entire sidebar */
 }
 
 .sidebar.collapsed {
@@ -42,18 +47,21 @@ body {
 }
 
 #instance-list-sidebar {
-    flex-grow: 1; /* Allow the instance list to take available space */
-    overflow-y: auto; /* Enable vertical scrolling */
-    padding-right: 5px; /* Add some padding for scrollbar */
+    /* flex-grow: 1; */ /* Removed as parent handles scrolling */
+    /* overflow-y: auto; */ /* Removed as parent handles scrolling */
+    padding-right: 5px;
+    /* Add some padding for scrollbar */
 }
 
 #main-content {
     flex-grow: 1;
     padding: 1.5rem;
-    overflow: hidden; /* Main content should not scroll itself */
+    overflow: hidden;
+    /* Main content should not scroll itself */
     display: flex;
     flex-direction: column;
-    height: 100%; /* Take full height of its parent (d-flex) */
+    height: 100%;
+    /* Take full height of its parent (d-flex) */
 }
 
 #sidebar-toggle-btn {
@@ -62,37 +70,52 @@ body {
 
 /* Overview Page Specific Styles */
 #overview-page {
-    flex-grow: 1; /* Allow overview page to take available space */
+    flex-grow: 1;
+    /* Allow overview page to take available space */
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Prevent this page from scrolling itself */
+    overflow: hidden;
+    /* Prevent this page from scrolling itself */
 }
 
 #overview-page .row {
-    flex-shrink: 0; /* Prevent stat cards from shrinking */
+    flex-shrink: 0;
+    /* Prevent stat cards from shrinking */
 }
 
 #instance-list-overview {
-    flex-grow: 1; /* Allow instance list to take available space */
-    overflow-y: scroll; /* Enable scrolling for instance list only */
-    padding-right: 15px; /* Add some padding for scrollbar */
-    display: flex; /* Enable flexbox for horizontal arrangement */
-    flex-wrap: wrap; /* Allow items to wrap to the next line */
-    gap: 1rem; /* Spacing between cards */
+    flex-grow: 1;
+    /* Allow instance list to take available space */
+    overflow-y: scroll;
+    /* Enable scrolling for instance list only */
+    padding-right: 15px;
+    /* Add some padding for scrollbar */
+    display: flex;
+    /* Enable flexbox for horizontal arrangement */
+    flex-wrap: wrap;
+    /* Allow items to wrap to the next line */
+    gap: 1rem;
+    /* Spacing between cards */
     max-height: calc(100vh - 300px);
 }
 
 /* Adjust card width for larger screens */
-@media (min-width: 1000px) { /* Two columns */
+@media (min-width: 1000px) {
+
+    /* Two columns */
     #overview-page #instance-list-overview .card {
-        max-width: calc(50% - 0.5rem); /* Two cards per row with spacing (half of gap) */
+        max-width: calc(50% - 0.5rem);
+        /* Two cards per row with spacing (half of gap) */
         flex: 0 0 calc(50% - 0.5rem);
     }
 }
 
-@media (min-width: 1350px) { /* Three columns for larger screens */
+@media (min-width: 1350px) {
+
+    /* Three columns for larger screens */
     #overview-page #instance-list-overview .card {
-        max-width: calc(33.333% - 0.666rem); /* Three cards per row with spacing */
+        max-width: calc(33.333% - 0.666rem);
+        /* Three cards per row with spacing */
         flex: 0 0 calc(33.333% - 0.666rem);
     }
 }
@@ -102,6 +125,10 @@ body {
     #overview-page #instance-list-overview .card {
         max-width: 100%;
         flex: 0 0 100%;
+    }
+
+    #instance-list-overview {
+        max-height: calc(100vh - 420px);
     }
 }
 
@@ -114,6 +141,7 @@ body {
         z-index: 1050;
         margin-left: -280px;
     }
+
     .sidebar.collapsed {
         margin-left: 0;
     }
@@ -123,16 +151,19 @@ body {
 .modal-grid-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem; /* Adjust spacing as needed */
+    gap: 1rem;
+    /* Adjust spacing as needed */
 }
 
 .modal-grid-col {
-    flex: 1 1 48%; /* For two columns, adjust 48% to account for gap */
+    flex: 1 1 48%;
+    /* For two columns, adjust 48% to account for gap */
 }
 
 @media (max-width: 768px) {
     .modal-grid-col {
-        flex: 1 1 100%; /* Stack columns on small screens */
+        flex: 1 1 100%;
+        /* Stack columns on small screens */
     }
 }
 
@@ -141,7 +172,7 @@ body {
     width: 100%;
     height: calc(100vh - 155px);
     background-color: #000;
-    padding:  5px 10px;
+    padding: 5px 10px;
     border-radius: 5px;
     overflow: hidden;
 }
@@ -158,7 +189,8 @@ body {
 /* Monaco Editor specific styles */
 #editor-container {
     width: 100%;
-    height: 60vh; /* Adjust height as needed, e.g., 60% of viewport height */
+    height: 60vh;
+    /* Adjust height as needed, e.g., 60% of viewport height */
     border: 1px solid #dee2e6;
     border-radius: .25rem;
 }
@@ -171,6 +203,7 @@ body {
         height: 100vh;
         margin: 0;
     }
+
     .modal-fullscreen-sm-down .modal-content {
         height: 100%;
         border: 0;
@@ -197,22 +230,30 @@ body {
 }
 
 /* New styles for port and volume modals */
-.port-row, .volume-row {
-    align-items: center; /* Vertically align items in the input group */
+.port-row,
+.volume-row {
+    align-items: center;
+    /* Vertically align items in the input group */
 }
 
-/* Ensure the display divs for ports/volumes in main forms have consistent height */
 #create-docker-ports-display,
 #create-docker-volumes-display,
 #settings-docker-ports-display,
 #settings-docker-volumes-display {
-    min-height: calc(1.5em + 0.75rem + 2px); /* Standard form-control height */
-    overflow-x: auto; /* Allow horizontal scrolling if content is too long */
-    white-space: nowrap; /* Prevent wrapping for long lists of ports/volumes */
-    align-items: center; /* Vertically align content */
-    display: flex; /* Use flexbox to align content */
-    padding-left: 0.75rem; /* Add left padding to align with other form controls */
-    padding-right: 0.75rem; /* Add right padding */
+    min-height: calc(1.5em + 0.75rem + 2px);
+    /* Standard form-control height */
+    overflow-x: auto;
+    /* Allow horizontal scrolling if content is too long */
+    white-space: nowrap;
+    /* Prevent wrapping for long lists of ports/volumes */
+    align-items: center;
+    /* Vertically align content */
+    display: flex;
+    /* Use flexbox to align content */
+    padding-left: 0.75rem;
+    /* Add left padding to align with other form controls */
+    padding-right: 0.75rem;
+    /* Add right padding */
 }
 
 #file-browser {
@@ -220,7 +261,6 @@ body {
     overflow-y: scroll;
 }
 
-/* 文件名裁切样式 */
 .file-name-display {
     white-space: nowrap;
     overflow: hidden;
@@ -229,27 +269,14 @@ body {
     vertical-align: middle;
 }
 
-/* 确保文件管理表格中的单元格内容不换行 */
 #file-browser .table td {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* 响应式操作按钮文字隐藏 */
-@media (max-width: 1400px) { /* 调整为1400px，只影响文件列表中的操作按钮 */
-    .file-actions .btn span {
-        display: none; /* 隐藏按钮文字 */
-    }
-    
-    .file-actions .btn i {
-        margin-right: 0 !important; /* 移除图标右侧边距 */
-    }
-}
-
-
 .sidebar-logo {
-    height: 2rem; /* Adjust as needed */
+    height: 2rem;
     width: auto;
     vertical-align: middle;
 }
