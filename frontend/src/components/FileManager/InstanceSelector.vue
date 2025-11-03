@@ -1,5 +1,5 @@
 <template>
-  <div class="mb-3">
+  <div class="mb-3" id="instance-selector">
     <h5>{{ t('files.instance.select') }}</h5>
     <div v-if="instancesStore.instances.length === 0" class="text-muted text-center p-4">
       {{ t('files.instance.no_available') }}
@@ -38,3 +38,10 @@ const selectInstance = (id) => {
   fileManagerStore.selectInstance(id);
 };
 </script>
+
+<style scoped>
+#instance-selector {
+    height: calc(100vh - 100px);
+    overflow-y: auto;
+}
+</style>

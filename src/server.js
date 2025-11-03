@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 
-import { VUE_DIST_PATH, PUBLIC_PATH, USERS_DB_PATH } from './config.js';
+import { VUE_DIST_PATH, USERS_DB_PATH, DB_PATH, WORKSPACES_PATH, UPLOAD_TEMP_DIR } from './config.js';
 import { firstRunCheck, isAuthenticated } from './api/middleware/auth.js';
 import apiRouter from './api/routes/index.js';
 import { initializeInstancesState } from './core/instanceManager.js';
@@ -40,14 +40,12 @@ app.use(sessionParser);
 app.use(firstRunCheck); // 检查是否首次运行
 
 // --- 静态文件服务 ---
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (fs.existsSync(path.join(VUE_DIST_PATH, 'index.html'))) {
     app.use(express.static(VUE_DIST_PATH));
     console.log('Serving Vue app from:', VUE_DIST_PATH);
 } else {
     console.warn('Vue app (frontend/dist/index.html) not found. Server may not function correctly.');
 }
-app.use(express.static(PUBLIC_PATH)); // 备用静态文件目录
 
 // --- API 路由 ---
 app.use('/api', apiRouter);
@@ -60,10 +58,12 @@ setupWebSocket(app, sessionParser);
 app.get('*', (req, res) => {
     // 首次运行时，允许访问设置页面
     const users = readDb(USERS_DB_PATH, []);
-    if (users.length === 0 && req.path === '/setup') {
-        return res.sendFile(path.join(PUBLIC_PATH, 'setup.html'));
+    if (req.path === '/setup') {
+        return res.sendFile(path.join(VUE_DIST_PATH, 'index.html'));
     }
-    
+    if (users.length === 0) {
+        return res.redirect('/setup');
+    }
     // 如果未认证，重定向到登录页
     if (!req.session.user) {
         return res.redirect('/');
@@ -83,6 +83,12 @@ app.get('*', (req, res) => {
 
 const lang = process.env.PANEL_LANG || 'en';
 i18n.setLang(lang);
+
+// 确保必要的目录存在
+await fs.ensureDir(DB_PATH);
+await fs.ensureDir(WORKSPACES_PATH);
+await fs.ensureDir(UPLOAD_TEMP_DIR);
+
 const PORT = process.env.PORT || panelSettings.panelPort || 3000;
 server.listen(PORT, async () => {
     console.log(i18n.t('server.server_running', { port: PORT }));

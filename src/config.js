@@ -20,4 +20,3 @@ export const SETTINGS_FILE = path.join(DB_PATH, 'settings.json');
 
 // --- 前端静态文件路径 ---
 export const VUE_DIST_PATH = path.join(__dirname_root, 'frontend', 'dist');
-export const PUBLIC_PATH = path.join(__dirname_root, 'public');
