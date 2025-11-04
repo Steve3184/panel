@@ -579,5 +579,15 @@
     "panelSettings.restartPanel": "パネルを再起動",
     "panelSettings.savedSuccess": "パネル設定が保存されました",
     "panelSettings.savedFailed": "パネル設定の保存に失敗しました",
-    "panelSettings.restartingPanel": "パネルを再起動しています。しばらくお待ちください..."
+    "panelSettings.restartingPanel": "パネルを再起動しています、しばらくお待ちください...",
+    "panelSettings.backgroundImage": "背景画像",
+    "panelSettings.clearBackgroundImage": "背景画像をクリア",
+    "panelSettings.backgroundImageClearSuccess": "背景画像を正常にクリアしました",
+    "panelSettings.backgroundImageUploadSuccess": "背景画像が正常にアップロードされました",
+    "panelSettings.preview": "プレビュー",
+    "panelSettings.backgroundImageUploadHint": "背景画像をアップロード",
+    "panelSettings.themeMode": "テーマモード",
+    "themeMode.dark": "ダーク",
+    "themeMode.light": "ライト",
+    "themeMode.auto": "自動"
   }

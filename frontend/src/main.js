@@ -15,15 +15,17 @@ async function initializeApp() {
     // 在 i18n 加载前获取面板设置
     let panelSettings = {};
     try {
+        const api = (await import('./services/api')).default; // 动态导入 api 服务
         panelSettings = await api.getPanelSettings();
     } catch (error) {
-        console.error('获取面板设置失败:', error);
+        console.error(error);
     }
 
     app.use(i18nPlugin, { panelSettings });
     app.use(router)
     app.mount('#app')
     const uiStore = useUiStore();
+    uiStore.panelSettings = panelSettings;
     uiStore.updatePanelLogo(panelSettings.panelLogo);
 }
 

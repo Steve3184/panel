@@ -25,7 +25,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import * as bootstrap from 'bootstrap';
-import * as monaco from 'monaco-editor';
 import { useUiStore } from '../../stores/ui';
 import { useWebSocketStore } from '../../stores/websocket';
 import api from '../../services/api';
@@ -79,6 +78,7 @@ const initializeEditor = async () => {
 
   try {
     const { content } = await api.getFileContent(props.instanceId, props.filePath);
+    const monaco = await import('monaco-editor');
     editor = monaco.editor.create(editorContainerEle.value, {
       value: content,
       language: getLanguageFromPath(props.filePath),

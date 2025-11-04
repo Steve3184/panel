@@ -52,7 +52,7 @@
             <Terminal v-if="instance.status === 'running'" :instance-id="instance.id" :is-read-only="isTerminalReadOnly" />
             <div v-else class="d-flex align-items-center justify-content-center h-100">
                 <div class="text-center">
-                    <p class="fs-4 text-muted">{{ $t('instances.stopped.hint') }}</p>
+                    <p class="fs-4 text-light">{{ $t('instances.stopped.hint') }}</p>
                     <button v-if="canOperate" class="btn btn-success mt-3" @click="performAction('start')">
                         {{ $t('instances.start') }}
                     </button>

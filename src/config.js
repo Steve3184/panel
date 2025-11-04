@@ -17,6 +17,7 @@ export const INSTANCES_DB_PATH = path.join(DB_PATH, 'instances.json');
 export const WORKSPACES_PATH = path.join(__dirname_root, 'workspaces');
 export const UPLOAD_TEMP_DIR = path.join(__dirname_root, 'uploads_temp');
 export const SETTINGS_FILE = path.join(DB_PATH, 'settings.json');
+export const BGIMAGE_PATH = path.join(DB_PATH, 'custom_background.jpg');
 
 // --- 前端静态文件路径 ---
 export const VUE_DIST_PATH = path.join(__dirname_root, 'frontend', 'dist');

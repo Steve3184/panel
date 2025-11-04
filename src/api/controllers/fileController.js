@@ -235,7 +235,7 @@ export const uploadChunk = (req, res) => {
     });
 
     busboy.on('error', (err) => {
-        res.status(500).json({ message: 'File upload parsing error', error: err.message });
+        res.status(500).json({ message: 'server.file_upload_chunk_failed_parsing', error: err.message });
     });
 
     req.pipe(busboy);

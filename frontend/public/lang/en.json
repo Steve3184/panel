@@ -570,7 +570,7 @@
     "websocket.established": "Backend WebSocket connection successful",
     "websocket.lost": "Backend WebSocket connection lost!",
     "panelSettings.title": "Panel Settings",
-    "panelSettings.panelName": "Panel Name",
+    "panelSettings.panelName": "Panel Title",
     "panelSettings.panelLogo": "Panel Logo",
     "panelSettings.enableGradioTunnel": "Enable Gradio Tunnel",
     "panelSettings.tunnelToken": "Tunnel Token",
@@ -579,5 +579,15 @@
     "panelSettings.restartPanel": "Restart Panel",
     "panelSettings.savedSuccess": "Panel settings saved successfully",
     "panelSettings.savedFailed": "Failed to save panel settings",
-    "panelSettings.restartingPanel": "Panel is restarting, please wait..."
+    "panelSettings.restartingPanel": "Panel is restarting, please wait...",
+    "panelSettings.backgroundImage": "Background Image",
+    "panelSettings.clearBackgroundImage": "Clear Background Image",
+    "panelSettings.backgroundImageClearSuccess": "Background image cleared successfully",
+    "panelSettings.backgroundImageUploadSuccess": "Background image uploaded successfully",
+    "panelSettings.preview": "Preview",
+    "panelSettings.backgroundImageUploadHint": "Upload Background Image",
+    "panelSettings.themeMode": "Theme Mode",
+    "themeMode.dark": "Dark",
+    "themeMode.light": "Light",
+    "themeMode.auto": "Auto"
   }

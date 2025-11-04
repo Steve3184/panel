@@ -4,9 +4,11 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
-import { Terminal } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
-import 'xterm/css/xterm.css';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { ClipboardAddon } from '@xterm/addon-clipboard';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import '@xterm/xterm/css/xterm.css';
 import { useWebSocketStore } from '../stores/websocket';
 import { useDebounceFn } from '@vueuse/core';
 
@@ -43,6 +45,8 @@ onMounted(() => {
   
   fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
+  term.loadAddon(new ClipboardAddon());
+  term.loadAddon(new WebLinksAddon());
   term.open(terminalContainer.value);
   
   // Subscribe to WebSocket

@@ -9,18 +9,20 @@ class ApiError extends Error {
 }
 
 async function request(url, options = {}) {
-  const defaultOptions = {
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
+  const defaultHeaders = {
+    'Accept': 'application/json',
   };
 
+  // 如果 body 是 FormData 实例，则不设置 Content-Type，让浏览器自动设置
+  if (!(options.body instanceof FormData)) {
+    defaultHeaders['Content-Type'] = 'application/json';
+  }
+
   const config = {
-    ...defaultOptions,
+    method: 'GET', // 默认 GET 请求
     ...options,
     headers: {
-      ...defaultOptions.headers,
+      ...defaultHeaders,
       ...options.headers,
     },
   };
@@ -85,5 +87,8 @@ export default {
   // Panel Settings
   getPanelSettings: () => request('/api/panel-settings'),
   updatePanelSettings: (settings) => request('/api/panel-settings', { method: 'POST', body: JSON.stringify(settings) }),
+  uploadBackgroundImage: (formData) => request('/api/panel-settings/background', { method: 'POST', body: formData, headers: {} }),
+  getBackgroundImage: () => fetch('/api/panel-settings/background', { method: 'GET', headers: {} }),
+  deleteBackgroundImage: () => request('/api/panel-settings/background', { method: 'DELETE' }),
   restartPanel: () => request('/api/panel-settings/restart', { method: 'POST' }),
 };

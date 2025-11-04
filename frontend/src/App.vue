@@ -1,14 +1,18 @@
 <template>
-  <RouterView v-slot="{ Component }">
-    <component :is="Component" />
-  </RouterView>
-  <ToastContainer />
-  <ChangePasswordModal v-if="uiStore.modals.changePassword" :user="uiStore.selectedUserForPasswordChange" />
-  <PanelSettingsModal v-if="uiStore.modals.panelSettings" :isVisible="uiStore.modals.panelSettings" :initialSettings="uiStore.panelSettings" @update:isVisible="uiStore.modals.panelSettings = $event" @save="handleSavePanelSettings" />
+  <div id="app-container" :class="{ 'has-background': uiStore.panelBackground !== '' }" :style="backgroundStyle">
+    <RouterView v-slot="{ Component }">
+      <component :is="Component" />
+    </RouterView>
+    <ToastContainer />
+    <ChangePasswordModal v-if="uiStore.modals.changePassword" :user="uiStore.selectedUserForPasswordChange" />
+    <PanelSettingsModal v-if="uiStore.modals.panelSettings" :isVisible="uiStore.modals.panelSettings"
+      :initialSettings="uiStore.panelSettings" @update:isVisible="uiStore.modals.panelSettings = $event"
+      @save="handleSavePanelSettings" />
+  </div>
 </template>
 
 <script setup>
-import { onMounted, watch } from 'vue';
+import { onMounted, watch, computed } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
 import { useWebSocketStore } from './stores/websocket';
 import { useSessionStore } from './stores/session';
@@ -19,6 +23,8 @@ import ChangePasswordModal from './components/modals/ChangePasswordModal.vue';
 import PanelSettingsModal from './components/modals/PanelSettingsModal.vue'; // 导入 PanelSettingsModal
 import { useI18n } from './composables/useI18n';
 
+import api from './services/api'; // 导入 api 服务
+
 const websocketStore = useWebSocketStore();
 const sessionStore = useSessionStore();
 const uiStore = useUiStore();
@@ -26,15 +32,13 @@ const instancesStore = useInstancesStore(); // 初始化 instances store
 const route = useRoute(); // 初始化 route
 const { t } = useI18n();
 
-import api from './services/api'; // 导入 api 服务
-
-const handleSavePanelSettings = async (settings) => {
+const handleSavePanelSettings = async () => {
   try {
-    await api.updatePanelSettings(settings);
-    uiStore.panelSettings = settings; // 更新全局设置
-    uiStore.showToast('面板设置已保存', 'success');
+    await uiStore.fetchPanelSettings(); // Refresh settings in store
+    uiStore.showToast(t('panelSettings.savedSuccess'), 'success');
   } catch (error) {
-    uiStore.showToast(`保存面板设置失败: ${error.message}`, 'danger');
+    console.error(t('panelSettings.savedFailed'), error);
+    uiStore.showToast(t('panelSettings.savedFailed') + ': ' + error.message, 'danger');
   }
 };
 
@@ -44,13 +48,33 @@ onMounted(async () => {
   if (isAuthenticated) {
     websocketStore.connect();
     // 获取面板设置
-    try {
-      const response = await api.getPanelSettings();
-      uiStore.panelSettings = response.settings; // 存储到 uiStore
-    } catch (error) {
-      console.error('Failed to fetch panel settings:', error);
+    await uiStore.fetchPanelSettings(); // 确保背景图片在应用加载时被获取
+    if (uiStore.panelSettings && uiStore.panelSettings.panelBackground) {
+      uiStore.updatePanelBackground(uiStore.panelSettings.panelBackground);
+    } else {
+      uiStore.updatePanelBackground(''); // 如果没有背景图片，则清空
     }
+    try {
+        const backgroundResponse = await api.getBackgroundImage();
+        if (backgroundResponse.ok) {
+            uiStore.updatePanelBackground('/api/panel-settings/background');
+            console.log('ok bg');
+        }
+    } catch (error) {}
   }
+});
+
+const backgroundStyle = computed(() => {
+  console.log('1',uiStore.panelBackground);
+  if (uiStore.panelBackground != '') {
+    return {
+      '--panel-background-image': `url(${uiStore.panelBackground})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      transition: 'background-image 0.5s ease-in-out', // Smooth transition
+    };
+  }
+  return {};
 });
 
 // 监听路由变化以更新页面标题
@@ -109,3 +133,41 @@ watch(
   { immediate: true } // 立即执行一次，以便在初始加载时设置标题
 );
 </script>
+
+<style>
+#app-container {
+  min-height: 100vh;
+  background-color: var(--bs-body-bg);
+  /* Default background color */
+  transition: background-color 0.5s ease-in-out;
+  /* Smooth transition for color */
+}
+
+#app-container.has-background {
+  background-color: transparent !important;
+  background-image: var(--panel-background-image); /* Use CSS variable for background image */
+  background-size: cover;
+  background-position: center;
+  transition: background-image 0.5s ease-in-out;
+}
+
+.bg-body-tertiary-transparent {
+  background-color: rgba(var(--bs-body-bg-rgb), 0.8) !important; /* 80% opacity */
+}
+
+/* Example of making components semi-transparent */
+/* You might need to apply this to specific components or a global overlay */
+.modal-content,
+.card,
+.bg-body-tertiary {
+  background-color: var(--bs-body-bg) !important;
+  /* Ensure components use theme background */
+  transition: background-color 0.5s ease-in-out;
+}
+
+/* Terminal transparency - adjust as needed */
+.xterm .xterm-viewport {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+  /* 60% transparency for terminal */
+}
+</style>

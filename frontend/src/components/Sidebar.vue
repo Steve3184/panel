@@ -1,5 +1,5 @@
 <template>
-    <nav class="sidebar p-3" :class="{ 'collapsed': uiStore.isSidebarCollapsed }">
+    <nav class="sidebar p-3" :class="{ 'collapsed': uiStore.isSidebarCollapsed, 'bg-body-tertiary': uiStore.panelBackground === '', 'bg-body-tertiary-transparent': uiStore.panelBackground !== '' }">
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4 class="mb-0">

@@ -579,5 +579,16 @@
     "panelSettings.restartPanel": "重启面板",
     "panelSettings.savedSuccess": "面板设置已保存",
     "panelSettings.savedFailed": "保存面板设置失败",
-    "panelSettings.restartingPanel": "面板正在重启，请稍候..."
+    "panelSettings.restartingPanel": "面板正在重启，请稍候...",
+    "panelSettings.backgroundImage": "背景图片",
+    "panelSettings.clearBackgroundImage": "清空背景图片",
+    "panelSettings.backgroundImageClearSuccess": "成功清空背景图片",
+    "panelSettings.backgroundImageUploadSuccess": "成功上传背景图片",
+    "panelSettings.clearBackgroundImage": "清空背景图片",
+    "panelSettings.preview": "预览",
+    "panelSettings.backgroundImageUploadHint": "上传背景图片",
+    "panelSettings.themeMode": "主题模式",
+    "themeMode.dark": "深色",
+    "themeMode.light": "浅色",
+    "themeMode.auto": "自动"
 }

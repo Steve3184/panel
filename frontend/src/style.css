@@ -21,8 +21,8 @@ body {
 
 .sidebar {
     width: 280px;
-    background-color: #212529;
-    color: white;
+    /* background-color: #212529; */
+    /* color: white; */
     transition: margin-left 0.3s ease;
     flex-shrink: 0;
     display: flex;
@@ -38,12 +38,12 @@ body {
 }
 
 .sidebar .nav-link {
-    color: #adb5bd;
+    color: var(--bs-secondary-color);
 }
 
 .sidebar .nav-link:hover,
 .sidebar .nav-link.active {
-    color: #fff;
+    color: var(--bs-emphasis-color);
 }
 
 #instance-list-sidebar {
@@ -171,7 +171,7 @@ body {
 #terminal-container {
     width: 100%;
     height: calc(100vh - 155px);
-    background-color: #000;
+    background-color: var(--bs-body-bg); /* Use theme background */
     padding: 5px 10px;
     border-radius: 5px;
     overflow: hidden;

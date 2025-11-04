@@ -8,7 +8,9 @@ export const useUiStore = defineStore('ui', () => {
     const isSidebarCollapsed = ref(false);
     const activePage = ref('overview'); // For switching between 'overview' and 'file-manager' in Dashboard
     const panelLogo = ref('');
+    const panelBackground = ref(''); // New state for panel background
     const panelSettings = ref(null); // New state for panel settings
+    const themeMode = ref('auto'); // 'light', 'dark', or 'auto'
     
     // Modal visibility state
     const modals = reactive({
@@ -43,6 +45,10 @@ export const useUiStore = defineStore('ui', () => {
         panelLogo.value = newPanelLogo;
     }
 
+    function updatePanelBackground(newPanelBackground) {
+        panelBackground.value = newPanelBackground;
+    }
+
     function toggleSidebar() {
         isSidebarCollapsed.value = !isSidebarCollapsed.value;
     }
@@ -62,10 +68,12 @@ export const useUiStore = defineStore('ui', () => {
 
     async function _fetchPanelSettings() {
         try {
-            panelSettings.value = await api.getPanelSettings();
+            const settings = await api.getPanelSettings();
+            panelSettings.value = settings;
+            panelLogo.value = settings.panelLogo;
+            panelBackground.value = settings.panelBackground || ''; // 确保 panelBackground 始终存在
         } catch (error) {
-            console.error('Failed to fetch panel settings:', error);
-            showToast(t('settings.panel.fetchError', { error: error.message }), 'danger');
+            console.error(error);
         }
     }
 
@@ -133,6 +141,40 @@ export const useUiStore = defineStore('ui', () => {
     }
 
 
+    function setThemeMode(mode) {
+        themeMode.value = mode;
+        localStorage.setItem('themeMode', mode);
+        applyTheme(mode);
+    }
+
+    function applyTheme(mode) {
+        const htmlElement = document.documentElement;
+        htmlElement.removeAttribute('data-bs-theme'); // Remove existing theme
+
+        if (mode === 'auto') {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            htmlElement.setAttribute('data-bs-theme', prefersDark ? 'dark' : 'light');
+        } else {
+            htmlElement.setAttribute('data-bs-theme', mode);
+        }
+    }
+
+    // Initialize theme from localStorage or system preference
+    const storedTheme = localStorage.getItem('themeMode');
+    if (storedTheme) {
+        themeMode.value = storedTheme;
+    } else {
+        themeMode.value = 'auto';
+    }
+    applyTheme(themeMode.value);
+
+    // Listen for system theme changes if in auto mode
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (themeMode.value === 'auto') {
+            applyTheme('auto');
+        }
+    });
+
     return {
         isSidebarCollapsed,
         activePage,
@@ -140,8 +182,11 @@ export const useUiStore = defineStore('ui', () => {
         selectedUserForPasswordChange,
         toasts,
         panelLogo,
-        panelSettings, // Expose panelSettings
+        themeMode,
+        panelSettings,
+        panelBackground,
         updatePanelLogo,
+        updatePanelBackground,
         toggleSidebar,
         setActivePage,
         openModal,
@@ -150,6 +195,7 @@ export const useUiStore = defineStore('ui', () => {
         removeToast,
         updateProgressToast,
         updateStatusToast,
-        fetchPanelSettings: _fetchPanelSettings // Expose the internal function
+        fetchPanelSettings: _fetchPanelSettings,
+        setThemeMode
     };
 });

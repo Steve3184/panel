@@ -32,7 +32,7 @@
                         <i class="bi bi-pencil-square"></i>
                       </button>
                     </td>
-                    <td>{{ user.role }}</td>
+                    <td>{{ $t('users.role.' + user.role) }}</td>
                     <td class="text-end">
                       <button class="btn btn-sm btn-warning me-2" @click="openChangePassword(user)">
                         <i class="bi bi-key me-1"></i> {{ $t('users.change_password') }}
