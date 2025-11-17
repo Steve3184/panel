@@ -13,6 +13,11 @@ const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
 // K: instanceId, V: { pty, listeners, history, ... }
 export const activeInstances = new Map();
 
+export function getInstanceById(instanceId) {
+    const instances = readDb(INSTANCES_DB_PATH, []);
+    return instances.find(i => i.id === instanceId);
+}
+
 export async function startInstance(instanceConfig) {
     if (activeInstances.has(instanceConfig.id)) {
         console.log(i18n.t('server.instance_session_already_running', { name: instanceConfig.name, id: instanceConfig.id }));

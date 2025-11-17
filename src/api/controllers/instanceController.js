@@ -121,7 +121,7 @@ export const handleInstanceAction = async (req, res) => {
 
 export const updateInstancePermissions = (req, res) => {
     const { instanceId, userId } = req.params;
-    const { terminalPermission, fileManagement } = req.body;
+    const { terminal, fileManagement } = req.body;
     
     let instances = readDb(INSTANCES_DB_PATH, []);
     const instanceIndex = instances.findIndex(i => i.id === instanceId);
@@ -134,7 +134,7 @@ export const updateInstancePermissions = (req, res) => {
     if (!instance.permissions) instance.permissions = {};
     
     const currentUserPermissions = instance.permissions[userId] || {};
-    if (terminalPermission !== undefined) currentUserPermissions.terminal = terminalPermission;
+    if (terminal !== undefined) currentUserPermissions.terminal = terminal;
     if (fileManagement !== undefined) currentUserPermissions.fileManagement = fileManagement;
     
     if (currentUserPermissions.terminal === null && !currentUserPermissions.fileManagement) {

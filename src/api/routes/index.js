@@ -3,6 +3,7 @@ import authRoutes from './auth.js';
 import userRoutes from './users.js';
 import instanceRoutes from './instances.js';
 import panelSettingsRoutes from './panelSettings.js'; // 导入 panelSettings 路由
+import webdavRoutes from './webdav.js'; // 导入 WebDAV 路由
 
 const router = express.Router();
 
@@ -11,5 +12,6 @@ router.use('/', authRoutes); // 挂载在 /api/
 router.use('/users', userRoutes); // 挂载在 /api/users
 router.use('/instances', instanceRoutes); // 挂载在 /api/instances
 router.use('/panel-settings', panelSettingsRoutes); // 挂载在 /api/panel-settings
+router.use('/dav', webdavRoutes); // 挂载在 /api/dav
 
 export default router;

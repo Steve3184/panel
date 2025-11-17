@@ -381,28 +381,25 @@ export const extractArchive = async (req, res) => {
                     sendCompletion('success', 'server.file_extracted_success');
 
                 } else {
-                    return res.status(400).json({ message: 'server.unsupported_archive_type' });
+                    sendCompletion('error', 'server.unsupported_archive_type');
+                    return;
                 }
 
             } catch (error) {
                 if (error.message.includes('Instance not found')) {
                     sendCompletion('error', 'server.instance_not_found');
-                    return res.status(404).json({ message: 'server.instance_not_found' });
+                    return;
                 }
                 if (error.message.includes('Access denied')) {
                     sendCompletion('error', 'server.no_perms');
-                    return res.status(403).json({ message: 'server.access_denied_outside' });
+                    return;
                 }
                 if (error.code === 'ENOENT') {
                     sendCompletion('error', 'server.file_or_directory_not_found_error');
-                    return res.status(404).json({ message: 'server.file_or_directory_not_found' });
+                    return;
                 }
                 console.error('server.extract_api_internal_error_log', error);
                 sendCompletion('error', 'server.extract_api_internal_error');
-                // 如果在 exec 之前发生错误，仍然需要发送 HTTP 响应
-                if (!res.headersSent) {
-                    res.status(500).json({ message: 'server.extract_api_internal_error', error: error.message });
-                }
             }
         })();
 
