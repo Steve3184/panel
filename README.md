@@ -1,170 +1,198 @@
 # The Panel
 
-English | [简体中文](README_CN.md)
+<div align="center">
 
-A powerful and user-friendly web-based server management panel designed to streamline the administration of instances, files, and users. Whether you're running shell commands or managing Docker containers, Panel provides a comprehensive interface for seamless control.
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen?style=flat-square)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange?style=flat-square)
+
+**English** | [简体中文](README_CN.md)
+
+**A powerful, user-friendly, web-based server management panel.**
+
+*Streamline the administration of instances, files, and users with a modern interface. Whether you are managing raw Shell commands or Docker containers, Panel provides seamless control.*
+
+[Features](#-features) • [Quick Start](#-quick-start) • [Configuration](#-configuration) • [Screenshots](#-screenshots)
+
+</div>
+
+---
 
 ## ✨ Features
 
--   **Instance Management**:
-    -   Effortlessly create, start, stop, restart, and terminate instances.
-    -   Supports both **Shell** and **Docker** instance types.
-    -   Comprehensive Docker configuration options: image, container name, port mappings, volume mounts, working directory, and custom commands.
-    -   Configurable auto-start on boot, auto-delete on exit, and auto-restart for robust operation.
-    -   Real-time monitoring of CPU and memory usage for each instance.
-    -   Interactive terminal access for all running instances.
-    -   <details><summary>Screenshot: Instance Overview</summary><img src="images/pic1.webp" alt="Instance Overview"></details>
-    -   <details><summary>Screenshot: Docker Instance Settings</summary><img src="images/pic2.webp" alt="Docker Instance Settings"></details>
+### 🖥️ Instance Management
+Take full control of your services with support for both **Shell** and **Docker** environments.
+-   **Lifecycle Control**: Create, start, stop, restart, and terminate instances with one click.
+-   **Docker Mastery**: Configure images, ports, volumes, working directories, and custom commands effortlessly.
+-   **Automation**: Set auto-start on boot, auto-restart on failure, and auto-delete on exit.
+-   **Monitoring**: Real-time CPU and Memory usage tracking.
+-   **Web Terminal**: Full interactive terminal access for every instance.
+-   <details><summary>📷 <i>View Screenshots</i></summary><br><img src="images/5.webp" alt="Instance Overview"><br><img src="images/12.webp" alt="Instance Terminal"><br><img src="images/2.webp" alt="Instance Settings"></details>
 
--   **User & Permission Management**:
-    -   Centralized user management for creating, deleting, and editing user accounts.
-    -   Role-Based Access Control (RBAC) with `admin` and `user` roles.
-    -   Admins can manage all aspects of users and instances.
-    -   Granular permission settings per instance:
-        -   **Terminal Access**: No access, Read-only, Read/Write, Read/Write & Operate (Start/Stop/Restart), Full Control.
-        -   **File Management**: Enable or disable file management features.
-    -   Secure password and username update functionalities.
-    -   <details><summary>Screenshot: User Management</summary><img src="images/pic3.webp" alt="User Management"></details>
-    -   <details><summary>Screenshot: Instance Permissions</summary><img src="images/pic4.webp" alt="Instance Permissions"></details>
+### 👥 User & Permission RBAC
+Secure and flexible user management designed for teams.
+-   **Roles**: Distinct `admin` and `user` roles.
+-   **Granular Control**: Define permissions per instance:
+    -   *Terminal*: No Access, Read-only, Read/Write, or Full Control.
+    -   *Files*: Toggle file management access.
+-   **Security**: Secure password updates and account management.
+-   <details><summary>📷 <i>View Screenshots</i></summary><br><img src="images/11.webp" alt="User Management"><br><img src="images/10.webp" alt="Instance Permissions"></details>
 
--   **File Management**:
-    -   Intuitive file browser for navigating, creating, deleting, and renaming files and folders.
-    -   Efficient file upload (supports chunked uploads for large files) and download capabilities.
-    -   **Online File Editor**: Integrated Monaco Editor with syntax highlighting for various languages, real-time saving, and WebSocket-based content synchronization.
-    -   **Archiving Operations**: Supports file compression (zip, 7z, tar.gz, tar.xz) and extraction (zip, 7z, tar, tar.gz, tar.xz, tar.bz2) directly within the panel.
-    -   Copy and move (cut-paste) operations for flexible file organization.
-    -   File editing blacklist to prevent accidental modification of binary or unsupported file types.
-    -   <details><summary>Screenshot: File Browser</summary><img src="images/pic5.webp" alt="File Browser"></details>
-    -   <details><summary>Screenshot: Online File Editor</summary><img src="images/pic6.webp" alt="Online File Editor"></details>
-    -   <details><summary>Screenshot: File Upload</summary><img src="images/pic7.webp" alt="File Upload"></details>
-    -   <details><summary>Screenshot: File Compression</summary><img src="images/pic8.webp" alt="File Compression"></details>
-    -   <details><summary>Screenshot: File Extraction</summary><img src="images/pic9.webp" alt="File Extraction"></details>
+### 📂 Advanced File Management
+A desktop-class file manager directly in your browser.
+-   **Operations**: Navigate, create, rename, copy, move (cut-paste), and delete.
+-   **Transfer**: Chunked uploads for large files and easy downloads.
+-   **Code Editor**: Monaco Editor integration (VS Code style) with syntax highlighting and real-time websocket sync.
+-   **Archives**: Compress (zip, 7z, tar.gz, etc.) and Extract (zip, tar, bz2, etc.) directly on the server.
+-   **Safety**: Blacklist protection for binary/system files.
+-   <details><summary>📷 <i>View Screenshots</i></summary><br><img src="images/9.webp" alt="File Browser"><br><img src="images/8.webp" alt="Online File Editor"></details>
 
--   **WebDAV Support**:
-    -   Access your instance files via WebDAV.
-    -   Uses HTTP Basic authentication with your Panel username and password.
-    -   Base URL: `/api/dav/<instance-id>/`.
-    -   You can copy the WebDAV URL directly from the file management page.
+### 🔗 Connectivity & Access
+-   **WebDAV Support**: Mount your instance files locally via WebDAV (`/api/dav/<instance-id>/`).
+-   **Gradio Tunnel**: Built-in remote access (no FRP/port forwarding required).
+-   **Internationalization**: Full i18n support (EN, CN, JP, etc.).
+-   **Responsive Design**: Works perfectly on mobile, tablet, and desktop.
 
--   **Internationalization (i18n)**:
-    -   Full multi-language support on both frontend and backend for a localized experience.
-
--   **Responsive UI**:
-    -   Modern and responsive user interface adapts to various screen sizes, providing a consistent experience across desktops, tablets, and mobile devices.
-    -   Collapsible sidebar and dynamic layout adjustments in the file manager for optimal usability.
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-
--   Node.js (v22 or higher)
-    -   **Quick Node.js 22 Installation on Ubuntu/Debian**:
-        ```bash
-        curl -sL https://deb.nodesource.com/setup_22.x | bash -
-        apt install nodejs
-        ```
--   Docker (Optional, for Docker instance management)
--   7-Zip (For advanced archiving operations, usually pre-installed on most systems or handled by `7zip-bin` package)
+*   **Node.js**: v22 or higher
+*   **Unzip**: For extracting releases
+*   **Docker**: (Optional) For container management
+*   **7-Zip**: (Optional) For advanced archiving features
 
 ### Installation
 
-**Recommended Installation as a systemd Service (for Linux Devices):**
+#### Option 1: Install from Release (Recommended) ⚡
+*Fastest deployment. No building required.*
 
-For optimal operation, it is recommended to install Panel as a systemd service. This ensures it runs continuously in the background and starts automatically on system boot.
+```bash
+# 1. Install Node.js 22 and tools
+curl -sL https://deb.nodesource.com/setup_22.x | bash -
+sudo apt install -y nodejs unzip
 
-1.  **Install Node.js 22 (if not already installed):**
+# 2. Download and extract
+sudo mkdir -p /opt/panel && cd /opt/panel
+sudo wget https://github.com/Steve3184/panel/releases/download/latest-build/release.zip
+sudo unzip release.zip && sudo rm release.zip
+
+# 3. Install dependencies
+sudo npm install --prod
+
+# 4. Setup Systemd Service
+sudo wget -O /etc/systemd/system/panel.service https://raw.githubusercontent.com/Steve3184/panel/main/panel.service
+sudo systemctl daemon-reload
+sudo systemctl enable panel
+sudo systemctl start panel
+```
+
+#### Option 2: Build from Source 🛠️
+*For developers or custom builds.*
+
+<details>
+<summary>Click to expand build instructions</summary>
+
+1.  **Install Node.js 22:**
     ```bash
     curl -sL https://deb.nodesource.com/setup_22.x | bash -
     sudo apt install -y nodejs
     ```
 
-2.  **Clone the repository to `/opt/panel`:**
+2.  **Clone Repository:**
     ```bash
     sudo git clone https://github.com/Steve3184/panel.git /opt/panel
     cd /opt/panel
     ```
 
-3.  **Install dependencies:**
+3.  **Install Dependencies & Build:**
     ```bash
     npm install
     cd frontend && npm install
-    ```
-
-4.  **Build the frontend:**
-    ```bash
     npm run build --prefix frontend
     ```
 
-
-5.  **Copy and configure the systemd service file:**
-    - a.  Copy the provided `panel.service` file to the systemd directory:
-        ```bash
-        sudo cp panel.service /etc/systemd/system/
-        ```
-    - b.  Edit the service file to ensure `WorkingDirectory` and `ExecStart` point to the correct paths. Since we cloned to `/opt/panel`, the default `panel.service` should already be configured correctly. If you chose a different installation path, you would modify it as follows:
-        ```
-        # Example modification if your project is in /home/user/panel
-        # WorkingDirectory=/home/user/panel
-        # ExecStart=/usr/bin/node /home/user/panel/src/server.js
-        ```
-        **Note**: The `ExecStart` path must be the absolute path to `server.js`.
-
-6.  **Reload systemd, enable, and start the Panel service:**
+4.  **Configure Service:**
     ```bash
+    sudo cp panel.service /etc/systemd/system/
+    # Edit service file if path differs from /opt/panel
     sudo systemctl daemon-reload
     sudo systemctl enable panel
     sudo systemctl start panel
     ```
+</details>
 
-7.  **Check the service status:**
-    ```bash
-    systemctl status panel
-    ```
+### Initial Setup
+Access the panel at `http://localhost:3000`.
+If no admin exists, you will be redirected to `/setup` to create the first account.
 
-8.  **Initial Setup:**
-    On first launch, if no admin user exists, you will be redirected to `http://localhost:3000/setup` to create an admin account.
+---
 
-### Configuration
+## ⚙️ Configuration
 
-You can configure the server language by setting the `PANEL_LANG` environment variable. For example, to set the language to Japanese:
+### Environment Variables
+You can configure the panel via environment variables or by modifying `src/server.js`.
 
-```bash
-PANEL_LANG=jp npm start
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `SESSION_SECRET` | Key used to sign the session ID cookie. **Change this in production.** | |
+| `PORT` | The port the server listens on. | `3000` |
+| `PANEL_LANG` | Server-side language (e.g., `jp`, `en`, `zh_CN`). | `en` |
+
+**Setting variables in `panel.service`:**
+Edit `/etc/systemd/system/panel.service` and add `Environment` lines under `[Service]`:
+
+```ini
+[Service]
+Environment="SESSION_SECRET=MySuperSecretKey123"
+Environment="PORT=8080"
+ExecStart=/usr/bin/node src/server.js
 ```
+*Remember to run `sudo systemctl daemon-reload && sudo systemctl restart panel` after changes.*
 
-Supported languages are defined in the `frontend/public/lang/` directory (e.g., `en.json`, `zh_CN.json`, `jp.json`).
+### 🌍 Remote Access (Gradio Tunnel)
+The panel includes built-in tunneling capabilities using Gradio, allowing you to access your panel from the public internet without configuring router port forwarding or setting up FRP.
+
+1.  Go to **Panel Settings** in the panel.
+2.  Enable **Gradio Tunnel**.
+3.  **Crucial**: Set a `Share Token`. This ensures your public URL remains constant. Without it, a random URL is generated on every restart.
+4.  Wait a moment, then refresh the Settings page to see your public link.
+
+### 🎨 UI Customization
+Make the panel your own via the **Panel Settings** page:
+-   **Title**: Change the browser tab and header title.
+-   **Logo**: Upload a custom image for the top-left corner.
+-   **Background**: Set a custom wallpaper for the login screen and dashboard.
+
+---
 
 ## 📸 Screenshots
 
--   **Login Page**:
-    <img src="images/pic10.webp" alt="Login Page" width="800"/>
+| Login Page | Instance Terminal | Panel Settings |
+| :---: | :---: | :---: |
+| <img src="images/1.webp" width="100%" alt="Login Page"/> | <img src="images/12.webp" width="100%" alt="Terminal"/> | <img src="images/4.webp" width="100%" alt="Panel Settings"/> |
 
--   **Overview Dashboard**:
-    <img src="images/pic1.webp" alt="Overview Dashboard" width="800"/>
+| Docker Instance Settings | Compress Files |
+| :---: | :---: |
+| <img src="images/7.webp" width="100%" alt="Docker Instance Settings"/> | <img src="images/6.webp" width="100%" alt="Compress Files"/> |
 
--   **Instance Terminal**:
-    <img src="images/pic11.webp" alt="Instance Terminal" width="800"/>
-
--   **Create Instance Modal**:
-    <img src="images/pic12.webp" alt="Create Instance Modal" width="800"/>
-
--   **File Manager - Directory View**:
-    <img src="images/pic5.webp" alt="File Manager Directory View" width="800"/>
-
--   **File Manager - File Editor**:
-    <img src="images/pic6.webp" alt="File Manager File Editor" width="800"/>
+---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+Contributions make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Distributed under the MIT License. See `LICENSE` for more information.
 
-## Disclaimer
+## ⚠️ Disclaimer
 
-**Windows Compatibility**:
-This panel was primarily developed for Linux devices. Its functionality on Windows has not been thoroughly tested and may encounter compatibility issues.
+**Windows Compatibility**: This panel is primarily developed for **Linux** environments. While it may run on Windows, functionality is not guaranteed and compatibility issues may arise.
 
-<small>_This repository contains code that was generated or assisted by AI._</small>
+<br>
+
+<p align="center">
+  <small><i>This repository contains code that was generated or assisted by AI.</i></small>
+</p>

@@ -10,7 +10,7 @@
           <i class="bi bi-server me-2"></i> {{ instance.name }}
         </div>
         <div class="d-flex align-items-center">
-          <button class="btn btn-xs btn-outline-secondary me-2" @click.stop="copyWebDAVLink(instance.id)" :title="t('files.copy_webdav_link')">
+          <button class="btn me-2" style="--bs-btn-padding-y: .25rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;" @click.stop="copyWebDAVLink(instance.id)" :title="t('files.copy_webdav_link')">
             <i class="bi bi-link-45deg"></i>
           </button>
           <span :class="['badge', instance.status === 'running' ? 'bg-success' : 'bg-secondary']">

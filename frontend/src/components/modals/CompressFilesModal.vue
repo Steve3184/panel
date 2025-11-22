@@ -4,7 +4,7 @@
       <div class="modal-content">
         <form @submit.prevent="handleSubmit">
           <div class="modal-header">
-            <h5 class="modal-title">{{ $t('files.compress.title') }} {{ fmStore.selectedFiles.size }} {{ $t('files.items') }}</h5>
+            <h5 class="modal-title">{{ $t('files.compress.title') }}</h5>
             <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
           </div>
           <div class="modal-body">

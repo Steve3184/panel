@@ -47,6 +47,19 @@ if (fs.existsSync(path.join(VUE_DIST_PATH, 'index.html'))) {
     console.warn('Vue app (frontend/dist/index.html) not found. Server may not function correctly.');
 }
 
+app.use((req, res, next) => {
+    // 如果是 /setup 路径，并且是 GET 请求，直接发送 Vue 应用的 index.html
+    if (req.method === 'GET' && req.path === '/setup') {
+        return res.sendFile(path.join(VUE_DIST_PATH, 'index.html'));
+    }
+
+    const users = readDb(USERS_DB_PATH, []);
+    if (users.length === 0 && (req.path == '/login' || req.path == '/')) {
+        return res.redirect('/setup');
+    }
+    next();
+});
+
 // --- API 路由 ---
 app.use('/api', apiRouter);
 
@@ -56,20 +69,6 @@ setupWebSocket(app, sessionParser);
 // --- Vue History Mode Fallback ---
 // 捕获所有未被 API 和静态文件处理的 GET 请求，返回 Vue 应用的入口
 app.get('*', (req, res) => {
-    // 首次运行时，允许访问设置页面
-    const users = readDb(USERS_DB_PATH, []);
-    if (req.path === '/setup') {
-        return res.sendFile(path.join(VUE_DIST_PATH, 'index.html'));
-    }
-    if (users.length === 0) {
-        return res.redirect('/setup');
-    }
-    // 如果未认证，重定向到登录页
-    if (!req.session.user) {
-        return res.redirect('/');
-    }
-
-    // 对于已认证用户，返回 Vue 应用
     const vueIndexHtmlPath = path.join(VUE_DIST_PATH, 'index.html');
     if (fs.existsSync(vueIndexHtmlPath)) {
         res.sendFile(vueIndexHtmlPath);

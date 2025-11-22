@@ -11,11 +11,9 @@ export const firstRunCheck = (req, res, next) => {
     if (users.length === 0 &&
         req.path !== '/api/setup' &&
         req.path !== '/api/login' &&
-        !req.path.startsWith('/css') &&
-        !req.path.startsWith('/js') &&
-        !req.path.startsWith('/frontend') && // 允许访问 Vue 资源
-        req.path !== '/setup' && // 允许访问设置页面
-        req.path !== '/' // 允许访问根路径
+        !req.path.startsWith('/assets') &&
+        !req.path.startsWith('/lang') &&
+        req.path !== '/setup' // 允许访问设置页面
     ) {
         return res.redirect('/setup');
     }

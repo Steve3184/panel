@@ -1,169 +1,198 @@
 # The Panel
 
-[English](README.md) | 简体中文
+<div align="center">
 
-一个功能强大且用户友好的网页版服务器管理面板，旨在简化实例、文件和用户的管理。无论您是运行 shell 命令还是管理 Docker 容器，Panel 都提供了一个全面的界面，以实现无缝控制。
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen?style=flat-square)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange?style=flat-square)
 
-## ✨ 功能
+[English](README.md) | **简体中文**
 
--   **实例管理**:
-    -   轻松创建、启动、停止、重启和终止实例。
-    -   支持 **Shell** 和 **Docker** 两种实例类型。
-    -   全面的 Docker 配置选项：镜像、容器名称、端口映射、卷挂载、工作目录和自定义命令。
-    -   可配置开机自启、退出时自动删除和自动重启，以实现稳定运行。
-    -   实时监控每个实例的 CPU 和内存使用情况。
-    -   为所有正在运行的实例提供交互式终端访问。
-    -   <details><summary>截图：实例概览</summary><img src="images/pic1.webp" alt="Instance Overview"></details>
-    -   <details><summary>截图：Docker 实例设置</summary><img src="images/pic2.webp" alt="Docker Instance Settings"></details>
+**一款强大、易用且基于 Web 的服务器管理面板。**
 
--   **用户与权限管理**:
-    -   集中式用户管理，用于创建、删除和编辑用户帐户。
-    -   基于角色的访问控制 (RBAC)，包含 `admin` 和 `user` 两种角色。
-    -   管理员可以管理用户和实例的所有方面。
-    -   精细的单实例权限设置：
-        -   **终端访问权限**：无权限、只读、读/写、读/写和操作 (启动/停止/重启)、完全控制。
-        -   **文件管理权限**：启用或禁用文件管理功能。
-    -   安全的密码和用户名更新功能。
-    -   <details><summary>截图：用户管理</summary><img src="images/pic3.webp" alt="User Management"></details>
-    -   <details><summary>截图：实例权限</summary><img src="images/pic4.webp" alt="Instance Permissions"></details>
+*通过现代化的用户界面，简化实例、文件及用户的管理流程。无论您是管理原始 Shell 命令还是 Docker 容器，Panel 都能为您提供流畅的控制体验。*
 
--   **文件管理**:
-    -   直观的文件浏览器，用于导航、创建、删除和重命名文件及文件夹。
-    -   高效的文件上传（支持大文件分块上传）和下载功能。
-    -   **在线文件编辑器**：集成了 Monaco Editor，支持多种语言的语法高亮、实时保存和基于 WebSocket 的内容同步。
-    -   **归档操作**：直接在面板内支持文件压缩 (zip, 7z, tar.gz, tar.xz) 和解压 (zip, 7z, tar, tar.gz, tar.xz, tar.bz2)。
-    -   复制和移动（剪切-粘贴）操作，实现灵活的文件组织。
-    -   文件编辑黑名单，防止意外修改二进制或不支持的文件类型。
-    -   <details><summary>截图：文件浏览器</summary><img src="images/pic5.webp" alt="File Browser"></details>
-    -   <details><summary>截图：在线文件编辑器</summary><img src="images/pic6.webp" alt="Online File Editor"></details>
-    -   <details><summary>截图：文件上传</summary><img src="images/pic7.webp" alt="File Upload"></details>
-    -   <details><summary>截图：文件压缩</summary><img src="images/pic8.webp" alt="File Compression"></details>
-    -   <details><summary>截图：文件解压</summary><img src="images/pic9.webp" alt="File Extraction"></details>
+[功能特性](#-功能特性) • [快速开始](#-快速开始) • [配置指南](#-配置指南) • [截图预览](#-截图预览)
 
--   **WebDAV 支持**:
-    -   通过 WebDAV 访问您的实例文件。
-    -   使用 HTTP Basic 认证，凭据为您的 Panel 用户名和密码。
-    -   基础 URL：`/api/dav/<instance-id>/`。
-    -   您可以在文件管理页面直接点击复制按钮复制 WebDAV URL。
+</div>
 
--   **国际化 (i18n)**:
-    -   前端和后端完全支持多语言，提供本地化体验。
+---
 
--   **响应式界面**:
-    -   现代化且响应式的用户界面，能适应各种屏幕尺寸，在桌面、平板和移动设备上提供一致的体验。
-    -   可折叠的侧边栏和文件管理器中的动态布局调整，以实现最佳可用性。
+## ✨ 功能特性
 
-## 🚀 快速入门
+### 🖥️ 实例管理
+全面掌控您的服务，完美支持 **Shell** 和 **Docker** 环境。
+-   **生命周期控制**：一键创建、启动、停止、重启及销毁实例。
+-   **Docker 深度集成**：轻松配置镜像、端口、挂载卷、工作目录及自定义命令。
+-   **自动化管理**：支持开机自启、失败自动重启及退出自动删除。
+-   **系统监控**：实时 CPU 和内存使用率追踪。
+-   **Web 终端**：为每个实例配备功能完整的交互式终端。
+-   <details><summary>📷 <i>查看截图</i></summary><br><img src="images/5.webp" alt="Instance Overview"><br><img src="images/12.webp" alt="Instance Terminal"><br><img src="images/2.webp" alt="Instance Settings"></details>
 
-### 先决条件
+### 👥 用户与 RBAC 权限管理
+专为团队设计的安全且灵活的用户管理系统。
+-   **角色体系**：区分 `admin`（管理员）和 `user`（普通用户）角色。
+-   **细粒度控制**：针对每个实例定义权限：
+    -   *终端权限*：无权限、只读、读/写或完全控制。
+    -   *文件权限*：独立的文件管理访问开关。
+-   **账户安全**：安全的密码更新及账户管理机制。
+-   <details><summary>📷 <i>查看截图</i></summary><br><img src="images/11.webp" alt="User Management"><br><img src="images/10.webp" alt="Instance Permissions"></details>
 
--   Node.js (v22 或更高版本)
-    -   **在 Ubuntu/Debian 上快速安装 Node.js 22**:
-        ```bash
-        curl -sL https://deb.nodesource.com/setup_22.x | bash -
-        apt install nodejs
-        ```
--   Docker (可选，用于 Docker 实例管理)
--   7-Zip (用于高级归档操作，通常在大多数系统上已预装或由 `7zip-bin` 软件包处理)
+### 📂 高级文件管理
+直接在浏览器中体验桌面级的文件管理器。
+-   **文件操作**：浏览、创建、重命名、复制、移动（剪切-粘贴）及删除。
+-   **传输功能**：支持大文件分片上传及便捷下载。
+-   **代码编辑器**：集成 Monaco Editor（VS Code 风格），支持语法高亮及 WebSocket 实时同步。
+-   **压缩归档**：支持直接在服务器端进行压缩（zip, 7z, tar.gz 等）和解压（zip, tar, bz2 等）。
+-   **安全机制**：针对二进制/系统文件的黑名单保护。
+-   <details><summary>📷 <i>查看截图</i></summary><br><img src="images/9.webp" alt="File Browser"><br><img src="images/8.webp" alt="Online File Editor"></details>
 
-### 安装
+### 🔗 连接与访问
+-   **WebDAV 支持**：通过 WebDAV 本地挂载实例文件 (`/api/dav/<instance-id>/`)。
+-   **Gradio 隧道**：内置远程访问功能（无需配置 FRP 或端口转发）。
+-   **国际化支持**：完整的 i18n 支持（中文、英文、日文等）。
+-   **响应式设计**：完美适配手机、平板及桌面端设备。
 
-**推荐将 Panel 安装为 systemd 服务 (适用于 Linux 设备):**
+---
 
-为了获得最佳运行效果，建议将 Panel 安装为 systemd 服务。这可以确保它在后台持续运行，并在系统启动时自动启动。
+## 🚀 快速开始
 
-1.  **安装 Node.js 22 (如果尚未安装):**
+### 环境要求
+*   **Node.js**：v22 或更高版本
+*   **Unzip**：用于解压 Release 包
+*   **Docker**：（可选）用于容器管理
+*   **7-Zip**：（可选）用于高级压缩功能
+
+### 安装指南
+
+#### 选项 1：使用 Release 包安装（推荐）⚡
+*部署速度最快，无需构建*
+
+```bash
+# 1. 安装 Node.js 22 及工具
+curl -sL https://deb.nodesource.com/setup_22.x | bash -
+sudo apt install -y nodejs unzip
+
+# 2. 下载并解压
+sudo mkdir -p /opt/panel && cd /opt/panel
+sudo wget https://github.com/Steve3184/panel/releases/download/latest-build/release.zip
+sudo unzip release.zip && sudo rm release.zip
+
+# 3. 安装生产环境依赖
+sudo npm install --prod
+
+# 4. 配置 Systemd 服务
+sudo wget -O /etc/systemd/system/panel.service https://raw.githubusercontent.com/Steve3184/panel/main/panel.service
+sudo systemctl daemon-reload
+sudo systemctl enable panel
+sudo systemctl start panel
+```
+
+#### 选项 2：源码编译安装 🛠️
+*适用于开发者或需要自定义构建的场景*
+
+<details>
+<summary>点击展开构建步骤</summary>
+
+1.  **安装 Node.js 22:**
     ```bash
     curl -sL https://deb.nodesource.com/setup_22.x | bash -
     sudo apt install -y nodejs
     ```
 
-2.  **将仓库克隆到 `/opt/panel`:**
+2.  **克隆仓库:**
     ```bash
     sudo git clone https://github.com/Steve3184/panel.git /opt/panel
     cd /opt/panel
     ```
 
-3.  **安装依赖:**
+3.  **安装依赖并构建:**
     ```bash
     npm install
     cd frontend && npm install
-    ```
-
-4.  **构建前端:**
-    ```bash
     npm run build --prefix frontend
     ```
 
-5.  **复制并配置 systemd 服务文件:**
-    - a.  将提供的 `panel.service` 文件复制到 systemd 目录：
-        ```bash
-        sudo cp panel.service /etc/systemd/system/
-        ```
-    - b.  编辑服务文件，确保 `WorkingDirectory` 和 `ExecStart` 指向正确的路径。由于我们克隆到了 `/opt/panel`，默认的 `panel.service` 应该已经配置正确。如果您选择了不同的安装路径，您需要像下面这样修改它：
-        ```
-        # 如果您的项目在 /home/user/panel 中的修改示例
-        # WorkingDirectory=/home/user/panel
-        # ExecStart=/usr/bin/node /home/user/panel/src/server.js
-        ```
-        **注意**: `ExecStart` 的路径必须是 `server.js` 的绝对路径。
-
-6.  **重新加载 systemd，启用并启动 Panel 服务:**
+4.  **配置服务:**
     ```bash
+    sudo cp panel.service /etc/systemd/system/
+    # 如果安装路径不是 /opt/panel，请编辑服务文件修改路径
     sudo systemctl daemon-reload
     sudo systemctl enable panel
     sudo systemctl start panel
     ```
+</details>
 
-7.  **检查服务状态:**
-    ```bash
-    systemctl status panel
-    ```
+### 初始化设置
+访问 `http://localhost:3000` 进入面板。
+如果系统中尚无管理员，页面将自动跳转至 `/setup` 以创建首个账户。
 
-8.  **初始设置:**
-    首次启动时，如果不存在管理员用户，您将被重定向到 `http://localhost:3000/setup` 来创建一个管理员帐户。
+---
 
-### 配置
+## ⚙️ 配置指南
 
-您可以通过设置 `PANEL_LANG` 环境变量来配置服务器语言。例如，要将语言设置为日语：
+### 环境变量
+您可以通过环境变量或修改 `src/server.js` 来配置面板。
 
-```bash
-PANEL_LANG=jp npm start
+| 变量名 | 描述 | 默认值 |
+| :--- | :--- | :--- |
+| `SESSION_SECRET` | 用于签名会话 ID cookie 的密钥。**生产环境中请务必修改此项。** | |
+| `PORT` | 服务器监听的端口。 | `3000` |
+| `PANEL_LANG` | 服务端语言设置（例如 `jp`, `en`, `zh_CN`）。 | `en` |
+
+**在 `panel.service` 中设置变量：**
+编辑 `/etc/systemd/system/panel.service` 并在 `[Service]` 下方添加 `Environment` 行：
+
+```ini
+[Service]
+Environment="SESSION_SECRET=MySuperSecretKey123"
+Environment="PORT=8080"
+ExecStart=/usr/bin/node src/server.js
 ```
+*注意：修改后请运行 `sudo systemctl daemon-reload && sudo systemctl restart panel` 使配置生效。*
 
-支持的语言定义在 `public/lang/` 目录中 (例如 `en.json`, `zh_CN.json`, `jp.json`)。
+### 🌍 远程访问 (Gradio 隧道)
+面板内置了基于 Gradio 的隧道功能，无需配置路由器端口转发或搭建 FRP，即可在公网访问您的面板。
 
-## 📸 屏幕截图
+1.  进入面板的 **面板设置**。
+2.  启用 **Gradio Tunnel**。
+3.  **重要提示**：请设置 `Share Token`（共享令牌）。这能确保您的公网 URL 保持不变。如果不设置，每次重启都会生成一个随机 URL。
+4.  稍等片刻，刷新设置页面即可查看生成的公网链接。
 
--   **登录页面**:
-    <img src="images/pic10.webp" alt="Login Page" width="800"/>
+### 🎨 界面个性化
+通过 **面板设置** 页面打造属于您的面板：
+-   **标题**：修改浏览器标签页和顶栏标题。
+-   **Logo**：上传自定义图片作为左上角 Logo。
+-   **背景**：设置登录页和仪表盘的自定义壁纸。
 
--   **概览仪表盘**:
-    <img src="images/pic1.webp" alt="Overview Dashboard" width="800"/>
+---
 
--   **实例终端**:
-    <img src="images/pic11.webp" alt="Instance Terminal" width="800"/>
+## 📸 截图预览
 
--   **创建实例模态框**:
-    <img src="images/pic12.webp" alt="Create Instance Modal" width="800"/>
+| 登录页 | 实例终端 | 面板设置 |
+| :---: | :---: | :---: |
+| <img src="images/1.webp" width="100%" alt="Login Page"/> | <img src="images/12.webp" width="100%" alt="Terminal"/> | <img src="images/4.webp" width="100%" alt="Panel Settings"/> |
 
--   **文件管理器 - 目录视图**:
-    <img src="images/pic5.webp" alt="File Manager Directory View" width="800"/>
+| Docker 实例设置 | 文件压缩 |
+| :---: | :---: |
+| <img src="images/7.webp" width="100%" alt="Docker Instance Settings"/> | <img src="images/6.webp" width="100%" alt="Compress Files"/> |
 
--   **文件管理器 - 文件编辑器**:
-    <img src="images/pic6.webp" alt="File Manager File Editor" width="800"/>
+---
 
-## 🤝 贡献
+## 🤝 贡献指南
 
-欢迎贡献！随时可以提交 issues 或 pull requests。
+开源社区之所以如此迷人，是因为这里是学习、激发灵感和创造的乐土。我们**非常感谢**您做出的任何贡献。
 
 ## 📄 许可证
 
-本项目基于 MIT 许可证 - 详情请见 [LICENSE](LICENSE) 文件。
+本项目基于 MIT 许可证分发。详情请参阅 `LICENSE` 文件。
 
-## 免责声明
+## ⚠️ 免责声明
 
-**Windows 兼容性**:
-此面板主要为 Linux 设备开发。其在 Windows 上的功能未经全面测试，可能会遇到兼容性问题。
+**Windows 兼容性**：本面板主要针对 **Linux** 环境开发。虽然它可能在 Windows 上运行，但不保证功能完整性，且可能会出现兼容性问题。
 
-<small>_本仓库包含由 AI 生成或辅助生成的代码_</small>
+<br>
+
+<p align="center">
+  <small><i>本项目包含由 AI 生成或辅助生成的代码</i></small>
+</p>

@@ -1,0 +1,58 @@
+name: Build Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Install dependencies
+      run: npm install
+      working-directory: ./frontend
+
+    - name: Build frontend
+      run: npm run build
+      working-directory: ./frontend
+
+    - name: Create Release Archive
+      run: |
+        mkdir -p build/frontend/{dist,public}
+        cp -r src build/
+        cp -r frontend/dist build/frontend/dist
+        cp -r frontend/public/lang build/frontend/public/lang
+        cp LICENSE build/
+        cp package.json build/
+        cd build && zip -r ../release.zip .
+
+    - name: Update Tag
+      uses: richardsimko/update-tag@v1
+      with:
+        tag_name: latest-build
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: latest-build
+        name: Latest Build
+        files: release.zip
+        overwrite: true
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

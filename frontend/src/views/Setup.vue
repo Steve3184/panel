@@ -23,6 +23,7 @@
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../services/api';
+import { useI18n } from '../composables/useI18n';
 
 const router = useRouter();
 const form = reactive({
@@ -30,19 +31,20 @@ const form = reactive({
   password: ''
 });
 const error = ref(null);
+const { t } = useI18n();
 
 async function handleSetup() {
   error.value = null;
   if (!form.password) {
-      error.value = $t('error.password_empty');
+      error.value = t('error.password_empty');
       return;
   }
   try {
     await api.setup(form);
-    alert($t('success.admin_account_created'));
+    alert(t('success.admin_account_created'));
     router.push('/login');
   } catch (err) {
-    error.value = err.message || $t('error.unknown_setup_error');
+    error.value = err.message || t('error.unknown_setup_error');
   }
 }
 </script>
