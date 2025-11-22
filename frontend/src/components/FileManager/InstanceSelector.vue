@@ -10,7 +10,7 @@
           <i class="bi bi-server me-2"></i> {{ instance.name }}
         </div>
         <div class="d-flex align-items-center">
-          <button class="btn btn-sm btn-outline-secondary me-2" @click.stop="copyWebDAVLink(instance.id)" :title="t('files.copy_webdav_link')">
+          <button class="btn btn-xs btn-outline-secondary me-2" @click.stop="copyWebDAVLink(instance.id)" :title="t('files.copy_webdav_link')">
             <i class="bi bi-link-45deg"></i>
           </button>
           <span :class="['badge', instance.status === 'running' ? 'bg-success' : 'bg-secondary']">
@@ -47,11 +47,29 @@ const selectInstance = (id) => {
 const copyWebDAVLink = async (instanceId) => {
   const webdavLink = `${window.location.origin}/api/dav/${instanceId}/`;
   try {
-    await navigator.clipboard.writeText(webdavLink);
-    uiStore.showToast(t('files.copy_webdav_link_success'), 'success');
+    // 使用Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(webdavLink);
+      uiStore.showToast(t('files.copy_webdav_link_success'), 'success');
+    } else {
+      // 备用方案，适用于非安全上下文
+      const textArea = document.createElement('textarea');
+      textArea.value = webdavLink;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      new Promise((res, rej) => {
+        document.execCommand('copy') ? res() : rej();
+        textArea.remove();
+      });
+      uiStore.showToast(t('files.copy_webdav_link_success'), 'success');
+    }
   } catch (err) {
     console.error('Failed to copy WebDAV link: ', err);
-    uiStore.showToast(t('files.copy_webdav_link_failed'), 'error'); // 需要添加这个i18n键
+    uiStore.showToast(t('files.copy_webdav_link_failed'), 'danger');
   }
 };
 </script>

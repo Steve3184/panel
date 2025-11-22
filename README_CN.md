@@ -40,6 +40,12 @@
     -   <details><summary>截图：文件压缩</summary><img src="images/pic8.webp" alt="File Compression"></details>
     -   <details><summary>截图：文件解压</summary><img src="images/pic9.webp" alt="File Extraction"></details>
 
+-   **WebDAV 支持**:
+    -   通过 WebDAV 访问您的实例文件。
+    -   使用 HTTP Basic 认证，凭据为您的 Panel 用户名和密码。
+    -   基础 URL：`/api/dav/<instance-id>/`。
+    -   您可以在文件管理页面直接点击复制按钮复制 WebDAV URL。
+
 -   **国际化 (i18n)**:
     -   前端和后端完全支持多语言，提供本地化体验。
 
@@ -160,4 +166,4 @@ PANEL_LANG=jp npm start
 **Windows 兼容性**:
 此面板主要为 Linux 设备开发。其在 Windows 上的功能未经全面测试，可能会遇到兼容性问题。
 
-<small>本仓库包含由 AI 生成或辅助生成的代码。虽然我们已努力确保其质量和功能，但用户在使用和部署前应彻底审查和测试代码。</small>
+<small>_本仓库包含由 AI 生成或辅助生成的代码_</small>

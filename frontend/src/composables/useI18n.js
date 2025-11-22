@@ -1,4 +1,4 @@
-import { ref, computed, inject } from 'vue';
+import { ref, computed, inject, watch } from 'vue';
 
 const i18nSymbol = Symbol('i18n');
 
@@ -56,7 +56,20 @@ export const i18nPlugin = {
             t,
             loadTranslations,
             saveLanguagePreference,
-            currentLang: computed(() => currentLang.value)
+            currentLang: computed(() => currentLang.value),
+            async waitTranslationLoad() {
+                if (Object.keys(translations.value).length > 1) {
+                    return;
+                }
+                return new Promise(resolve => {
+                    const stopWatch = watch(translations, (newVal) => {
+                        if (Object.keys(newVal).length > 1) {
+                            stopWatch();
+                            resolve();
+                        }
+                    }, { deep: true });
+                });
+            }
         };
 
         app.provide(i18nSymbol, i18n);

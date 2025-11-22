@@ -1,5 +1,5 @@
 <template>
-  <body class="d-flex align-items-center py-4 bg-body-tertiary">
+  <div class="d-flex align-items-center py-4 vh-100">
     <main class="form-signin w-100 m-auto">
       <form @submit.prevent="handleLogin">
         <h1 class="h3 mb-3 fw-normal">{{ $t('login.heading') }}</h1>
@@ -14,7 +14,7 @@
         <button class="btn btn-primary w-100 py-2 mt-3" type="submit">{{ $t('login.button') }}</button>
       </form>
     </main>
-  </body>
+  </div>
 </template>
 
 <script setup>

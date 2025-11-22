@@ -30,7 +30,7 @@ const sessionStore = useSessionStore();
 const uiStore = useUiStore();
 const instancesStore = useInstancesStore(); // 初始化 instances store
 const route = useRoute(); // 初始化 route
-const { t } = useI18n();
+const { t, waitTranslationLoad } = useI18n();
 
 const handleSavePanelSettings = async () => {
   try {
@@ -47,25 +47,22 @@ onMounted(async () => {
   const isAuthenticated = await sessionStore.checkSession();
   if (isAuthenticated) {
     websocketStore.connect();
-    // 获取面板设置
-    await uiStore.fetchPanelSettings(); // 确保背景图片在应用加载时被获取
-    if (uiStore.panelSettings && uiStore.panelSettings.panelBackground) {
-      uiStore.updatePanelBackground(uiStore.panelSettings.panelBackground);
-    } else {
-      uiStore.updatePanelBackground(''); // 如果没有背景图片，则清空
-    }
-    try {
-        const backgroundResponse = await api.getBackgroundImage();
-        if (backgroundResponse.ok) {
-            uiStore.updatePanelBackground('/api/panel-settings/background');
-            console.log('ok bg');
-        }
-    } catch (error) {}
   }
+  await uiStore.fetchPanelSettings();
+  if (uiStore.panelSettings && uiStore.panelSettings.panelBackground) {
+    uiStore.updatePanelBackground(uiStore.panelSettings.panelBackground);
+  } else {
+    uiStore.updatePanelBackground('');
+  }
+  try {
+    const backgroundResponse = await api.getBackgroundImage();
+    if (backgroundResponse.ok) {
+      uiStore.updatePanelBackground('/api/panel-settings/background');
+    }
+  } catch (error) { }
 });
 
 const backgroundStyle = computed(() => {
-  console.log('1',uiStore.panelBackground);
   if (uiStore.panelBackground != '') {
     return {
       '--panel-background-image': `url(${uiStore.panelBackground})`,
@@ -81,7 +78,8 @@ const backgroundStyle = computed(() => {
 watch(
   () => route.fullPath,
   async () => {
-    let title = t('panel.name'); // 默认标题
+    await waitTranslationLoad();
+    let title = t('panel.name');
     let pageName = '';
 
     switch (route.name) {

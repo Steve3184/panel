@@ -40,6 +40,12 @@ A powerful and user-friendly web-based server management panel designed to strea
     -   <details><summary>Screenshot: File Compression</summary><img src="images/pic8.webp" alt="File Compression"></details>
     -   <details><summary>Screenshot: File Extraction</summary><img src="images/pic9.webp" alt="File Extraction"></details>
 
+-   **WebDAV Support**:
+    -   Access your instance files via WebDAV.
+    -   Uses HTTP Basic authentication with your Panel username and password.
+    -   Base URL: `/api/dav/<instance-id>/`.
+    -   You can copy the WebDAV URL directly from the file management page.
+
 -   **Internationalization (i18n)**:
     -   Full multi-language support on both frontend and backend for a localized experience.
 
@@ -161,4 +167,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Windows Compatibility**:
 This panel was primarily developed for Linux devices. Its functionality on Windows has not been thoroughly tested and may encounter compatibility issues.
 
-<small>This repository contains code that was generated or assisted by AI. While efforts have been made to ensure its quality and functionality, users should thoroughly review and test the code before deployment.</small>
+<small>_This repository contains code that was generated or assisted by AI._</small>
