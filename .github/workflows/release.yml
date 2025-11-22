@@ -31,7 +31,7 @@ jobs:
 
     - name: Create Release Archive
       run: |
-        mkdir -p build/frontend/{dist,public}
+        mkdir -p build/frontend/public
         cp -r src build/
         cp -r frontend/dist build/frontend/dist
         cp -r frontend/public/lang build/frontend/public/lang
@@ -52,7 +52,7 @@ jobs:
         tag_name: latest-build
         name: Latest Build
         files: release.zip
-        overwrite: true
+        overwrite_files: true
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
