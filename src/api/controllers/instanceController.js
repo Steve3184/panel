@@ -3,6 +3,7 @@ import { readDb, writeDb } from '../../data/db.js';
 import { INSTANCES_DB_PATH, USERS_DB_PATH, WORKSPACES_PATH } from '../../config.js';
 import * as instanceManager from '../../core/instanceManager.js';
 import { broadcast } from '../../websocket/handler.js';
+import path from 'path';
 
 export const getAllInstances = (req, res) => {
     const instances = readDb(INSTANCES_DB_PATH, []);

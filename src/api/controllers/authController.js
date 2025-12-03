@@ -1,11 +1,7 @@
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import axios from 'axios';
-import fs from 'fs-extra';
-import path from 'path';
 import { readDb, writeDb } from '../../data/db.js';
 import { USERS_DB_PATH, SALT_ROUNDS } from '../../config.js';
-import i18n from '../../utils/i18n.js';
 
 export const setupAdmin = (req, res) => {
     const users = readDb(USERS_DB_PATH, []);
