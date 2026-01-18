@@ -39,7 +39,7 @@ export async function startInstance(instanceConfig) {
         if (!image) throw new Error(`Docker 实例 ${instanceConfig.name} 未指定镜像 (image)`);
 
         const execCommand = dockerConfig.command ? dockerConfig.command.split(/\s+/) : null;
-        effectiveCwd = dockerConfig.workingDir || '/workspace';
+        let effectiveCwd = dockerConfig.workingDir || '/workspace';
         let container;
         let attachMode = false;
 

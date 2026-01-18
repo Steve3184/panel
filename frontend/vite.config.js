@@ -6,7 +6,9 @@ import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm';
 export default defineConfig({
   plugins: [
     vue(),
-    monacoEditorPlugin()
+    monacoEditorPlugin({
+      languageWorkers: ['editorWorkerService', 'json', 'html'], 
+    })
   ],
   server: {
     proxy: {

@@ -23,6 +23,7 @@ export const createUser = async (req, res) => {
     const newUser = { id: uuidv4(), username, passwordHash, role: role || 'user' };
     users.push(newUser);
     writeDb(USERS_DB_PATH, users);
+    req.app.get('userEvents').emit('userAdded');
     res.status(201).json({ id: newUser.id, username: newUser.username, role: newUser.role });
 };
 

@@ -2,10 +2,12 @@ import express from 'express';
 import http from 'http';
 import expressWs from 'express-ws';
 import session from 'express-session';
+import FileStoreFactory from 'session-file-store';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
+import { EventEmitter } from 'events';
 
 import { VUE_DIST_PATH, USERS_DB_PATH, DB_PATH, WORKSPACES_PATH, UPLOAD_TEMP_DIR } from './config.js';
 import { firstRunCheck, isAuthenticated } from './api/middleware/auth.js';
@@ -29,12 +31,24 @@ app.use(express.json()); // 解析 JSON 请求体
 // 允许所有来源的跨域请求
 app.use(cors());
 
+const FileStore = FileStoreFactory(session);
+
 const sessionParser = session({
+    store: new FileStore({
+        path: './sessions',
+        ttl: 86400,
+        retries: 1,
+        factor: 1,
+        minTimeout: 50,
+        maxTimeout: 100,
+        logFn: function(){}
+    }),
     secret: process.env.SESSION_SECRET || 'a-very-secret-key-that-should-be-in-env-vars',
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false } // 在生产环境中应设为 true 并使用 HTTPS
-});
+})
+
 app.use(sessionParser);
 
 app.use(firstRunCheck); // 检查是否首次运行
@@ -47,14 +61,20 @@ if (fs.existsSync(path.join(VUE_DIST_PATH, 'index.html'))) {
     console.warn('Vue app (frontend/dist/index.html) not found. Server may not function correctly.');
 }
 
+let userCount = readDb(USERS_DB_PATH, []).length;
+const userEvents = new EventEmitter();
+userEvents.on('userAdded', () => {
+    userCount++;
+});
+
+app.set('userEvents', userEvents);
+
 app.use((req, res, next) => {
-    // 如果是 /setup 路径，并且是 GET 请求，直接发送 Vue 应用的 index.html
     if (req.method === 'GET' && req.path === '/setup') {
         return res.sendFile(path.join(VUE_DIST_PATH, 'index.html'));
     }
 
-    const users = readDb(USERS_DB_PATH, []);
-    if (users.length === 0 && (req.path == '/login' || req.path == '/')) {
+    if (userCount === 0 && (req.path == '/login' || req.path == '/')) {
         return res.redirect('/setup');
     }
     next();
@@ -66,15 +86,18 @@ app.use('/api', apiRouter);
 // --- WebSocket 设置 ---
 setupWebSocket(app, sessionParser);
 
-// --- Vue History Mode Fallback ---
-// 捕获所有未被 API 和静态文件处理的 GET 请求，返回 Vue 应用的入口
+const INDEX_HTML_PATH = path.join(VUE_DIST_PATH, 'index.html');
+
 app.get('*', (req, res) => {
-    const vueIndexHtmlPath = path.join(VUE_DIST_PATH, 'index.html');
-    if (fs.existsSync(vueIndexHtmlPath)) {
-        res.sendFile(vueIndexHtmlPath);
-    } else {
-        res.status(404).send('Application entry point not found.');
-    }
+    res.sendFile(INDEX_HTML_PATH, (err) => {
+        if (err) {
+            if (err.code === 'ENOENT') {
+                res.status(404).send('File not found.');
+            } else if (!res.headersSent) {
+                res.status(500).send('Internal Server Error');
+            }
+        }
+    });
 });
 
 
@@ -87,6 +110,7 @@ i18n.setLang(lang);
 await fs.ensureDir(DB_PATH);
 await fs.ensureDir(WORKSPACES_PATH);
 await fs.ensureDir(UPLOAD_TEMP_DIR);
+await fs.ensureDir('./sessions');
 
 const PORT = process.env.PORT || panelSettings.panelPort || 3000;
 server.listen(PORT, async () => {

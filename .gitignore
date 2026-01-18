@@ -3,5 +3,7 @@ cdn_cache/
 db/
 uploads_temp/
 workspaces/
+sessions/
 package-lock.json
 src/utils/frpc_*
+.clinic/
