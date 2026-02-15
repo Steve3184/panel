@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'src/**'
+      - 'frontend/**'
 
 permissions:
   contents: write
@@ -92,7 +95,7 @@ jobs:
         if: matrix.artifact_name == 'linux-x64'
         uses: actions/upload-artifact@v4
         with:
-          name: release-frontend
+          name: frontend-release
           path: release-frontend.zip
           retention-days: 1
 
@@ -110,7 +113,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Build #${{ github.run_number }}
+          name: "Build #${{ github.run_number }}"
           files: |
             artifacts/release-linux-x64/release-linux-x64.zip
             artifacts/release-linux-arm64/release-linux-arm64.zip

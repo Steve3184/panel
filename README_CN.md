@@ -57,66 +57,80 @@
 
 ## 🚀 快速开始
 
-### 环境要求
-*   **Node.js**：v22 或更高版本
-*   **Unzip**：用于解压 Release 包
-*   **Docker**：（可选）用于容器管理
-*   **7-Zip**：（可选）用于高级压缩功能
+### 前置要求
+*   **Unzip**: 用于解压发布包
+*   **Docker**: （可选）用于容器管理
+*   **7-Zip**: （可选）用于高级压缩功能
 
-### 安装指南
+**注意**：使用预构建版本时**无需**安装 Node.js，因为所有依赖已包含在内。
 
-#### 选项 1：使用 Release 包安装（推荐）⚡
-*部署速度最快，无需构建*
+### 安装
 
+#### 方案 1：从发布版安装（推荐）⚡
+*最快部署方式，无需编译工具。*
+
+**Linux x64 系统：**
 ```bash
-# 1. 安装 Node.js 22 及工具
-curl -sL https://deb.nodesource.com/setup_22.x | bash -
-sudo apt install -y nodejs unzip
+# 1. 安装unzip和wget
+sudo apt install -y unzip wget
 
 # 2. 下载并解压
 sudo mkdir -p /opt/panel && cd /opt/panel
-sudo wget https://github.com/Steve3184/panel/releases/download/latest-build/release.zip
-sudo unzip release.zip && sudo rm release.zip
+sudo wget https://github.com/Steve3184/panel/releases/download/latest/release-linux-x64.zip
+sudo unzip release-linux-x64.zip && sudo rm release-linux-x64.zip
 
-# 3. 安装生产环境依赖
-sudo npm install --prod
-
-# 4. 配置 Systemd 服务
+# 3. 配置 Systemd 服务
 sudo wget -O /etc/systemd/system/panel.service https://raw.githubusercontent.com/Steve3184/panel/main/panel.service
 sudo systemctl daemon-reload
 sudo systemctl enable panel
 sudo systemctl start panel
 ```
 
-#### 选项 2：源码编译安装 🛠️
-*适用于开发者或需要自定义构建的场景*
+**Linux ARM64 系统：**
+```bash
+# 使用 release-linux-arm64.zip 替代
+sudo wget https://github.com/Steve3184/panel/releases/download/latest/release-linux-arm64.zip
+sudo unzip release-linux-arm64.zip && sudo rm release-linux-arm64.zip
+# ...
+```
+
+**Windows x64 系统：**
+```powershell
+# 从以下地址下载 release-win-x64.zip：
+# https://github.com/Steve3184/panel/releases/download/latest/release-win-x64.zip
+# 解压后运行：node src/server.js
+```
+
+#### 方案 2：从源码构建 🛠️
+*适用于开发者或自定义构建。*
 
 <details>
-<summary>点击展开构建步骤</summary>
+<summary>点击展开构建说明</summary>
 
-1.  **安装 Node.js 22:**
+1.  **安装 Node.js 22：**
     ```bash
     curl -sL https://deb.nodesource.com/setup_22.x | bash -
     sudo apt install -y nodejs
     ```
 
-2.  **克隆仓库:**
+2.  **克隆仓库：**
     ```bash
     sudo git clone https://github.com/Steve3184/panel.git /opt/panel
     cd /opt/panel
     ```
 
-3.  **安装依赖并构建:**
+3.  **安装依赖并构建：**
     ```bash
     npm install
     cd frontend && npm install
-    npm run build --prefix frontend
+    npm run build
+    cd ..
     ```
 
-4.  **配置服务:**
+4.  **配置服务：**
     ```bash
     sudo cp panel.service /etc/systemd/system/
-    # 如果安装路径不是 /opt/panel，请编辑服务文件修改路径
+    # 如果路径不是 /opt/panel，请编辑服务文件
     sudo systemctl daemon-reload
     sudo systemctl enable panel
     sudo systemctl start panel
