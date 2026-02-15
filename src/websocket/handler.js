@@ -1,5 +1,5 @@
 import fs from 'fs-extra';
-import { activeInstances } from '../core/instanceManager.js';
+import { activeInstances, stoppedInstancesHistory, switchDockerComposeContainer } from '../core/instanceManager.js';
 import { getFileAbsolutePath } from '../core/fileManager.js';
 import { checkUserInstancePermission } from '../api/middleware/permissions.js';
 import i18n from '../utils/i18n.js';
@@ -57,6 +57,14 @@ async function handleMessage(ws, messageData) {
                     ws.subscribedInstanceId = message.id;
                     instance.listeners.add(ws);
                     send(ws, { type: 'output', id: message.id, data: instance.history });
+                } else if (stoppedInstancesHistory.has(message.id)) {
+                     // Check permission for stopped instance as well
+                    if (!checkUserInstancePermission(ws.user, message.id, 'read-only', false)) {
+                        send(ws, { type: 'error', message: 'server.permission_denied_subscribe_instance' });
+                        return;
+                    }
+                    const history = stoppedInstancesHistory.get(message.id);
+                    send(ws, { type: 'output', id: message.id, data: history });
                 }
                 break;
             case 'unsubscribe':
@@ -81,6 +89,20 @@ async function handleMessage(ws, messageData) {
                         return;
                     }
                     instance.pty.resize(message.cols, message.rows);
+                }
+                break;
+            case 'switch-container':
+                if (instance) {
+                    // Check permission (read-only is enough to switch view, input is checked separately)
+                    if (!checkUserInstancePermission(ws.user, message.id, 'read-only', false)) {
+                        send(ws, { type: 'error', message: 'server.permission_denied_subscribe_instance' });
+                        return;
+                    }
+                    try {
+                        await switchDockerComposeContainer(message.id, message.containerName);
+                    } catch (e) {
+                         send(ws, { type: 'error', message: e.message });
+                    }
                 }
                 break;
             case 'subscribe-file-edit':

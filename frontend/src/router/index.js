@@ -5,6 +5,7 @@ import Login from '../views/Login.vue'
 import Setup from '../views/Setup.vue'
 import InstanceDetail from '../views/InstanceDetail.vue';
 import UserManagement from '../views/UserManagement.vue';
+import ServerLogs from '../views/ServerLogs.vue';
 import NotFound from '../views/NotFound.vue';
 import FileManager from '../views/FileManager.vue';
 
@@ -39,6 +40,12 @@ const router = createRouter({
         name: 'UserManagement',
         component: UserManagement,
         meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+      path: '/logs',
+      name: 'ServerLogs',
+      component: ServerLogs,
+      meta: { requiresAuth: true, requiresAdmin: true }
     },
     {
       path: '/files',

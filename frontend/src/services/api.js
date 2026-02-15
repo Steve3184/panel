@@ -61,6 +61,7 @@ export default {
   updateInstance: (id, data) => request(`/api/instances/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteInstance: (id, deleteData) => request(`/api/instances/${id}?deleteData=${deleteData}`, { method: 'DELETE' }),
   instanceAction: (id, action) => request(`/api/instances/${id}/action`, { method: 'POST', body: JSON.stringify({ action }) }),
+  getComposeContainers: (id) => request(`/api/instances/${id}/containers`),
   
   // Users
   getUsers: () => request('/api/users'),
@@ -83,6 +84,10 @@ export default {
   move: (instanceId, files, destination) => request(`/api/instances/${instanceId}/move`, { method: 'POST', body: JSON.stringify({ files, destination }) }),
   extract: (instanceId, filePath, destinationPath) => request(`/api/instances/${instanceId}/extract`, { method: 'POST', body: JSON.stringify({ filePath, destinationPath }) }),
   compress: (instanceId, filesToCompress, destinationPath, outputName, format, level) => request(`/api/instances/${instanceId}/compress`, { method: 'POST', body: JSON.stringify({ filesToCompress, destinationPath, outputName, format, level }) }),
+
+  // Logs
+  getLogs: () => request('/api/logs'),
+  getLogContent: (filename) => request(`/api/logs/${filename}`),
 
   // Panel Settings
   getPanelSettings: () => request('/api/panel-settings'),

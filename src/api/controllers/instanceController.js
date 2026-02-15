@@ -4,6 +4,7 @@ import { INSTANCES_DB_PATH, USERS_DB_PATH, WORKSPACES_PATH } from '../../config.
 import * as instanceManager from '../../core/instanceManager.js';
 import { broadcast } from '../../websocket/handler.js';
 import path from 'path';
+import fs from 'fs-extra';
 
 export const getAllInstances = (req, res) => {
     const instances = readDb(INSTANCES_DB_PATH, []);
@@ -21,17 +22,29 @@ export const getAllInstances = (req, res) => {
 };
 
 export const createInstance = (req, res) => {
-    const { name, command, cwd, type, autoStartOnBoot, autoDeleteOnExit, autoRestart, env, dockerConfig } = req.body;
-    if (!command && type !== 'docker') return res.status(400).json({ message: 'server.command_required' });
+    const { name, command, cwd, type, autoStartOnBoot, autoDeleteOnExit, autoRestart, env, dockerConfig, dockerComposeContent } = req.body;
+    if (!command && type !== 'docker' && type !== 'docker_compose') return res.status(400).json({ message: 'server.command_required' });
     if (type === 'docker' && !dockerConfig?.image) return res.status(400).json({ message: 'server.image_required' });
+    if (type === 'docker_compose' && !dockerComposeContent) return res.status(400).json({ message: 'server.docker_compose_not_found' });
 
     const id = uuidv4();
+    const finalCwd = cwd || path.join(WORKSPACES_PATH, id);
+
+    if (type === 'docker_compose') {
+        try {
+            fs.ensureDirSync(finalCwd);
+            fs.writeFileSync(path.join(finalCwd, 'docker-compose.yml'), dockerComposeContent);
+        } catch (error) {
+            return res.status(500).json({ message: 'server.failed_to_create_file', error: error.message });
+        }
+    }
+
     const newInstance = {
         id,
         name: name || id.substring(0, 8),
         type: type || 'shell',
         command,
-        cwd: cwd || path.join(WORKSPACES_PATH, id),
+        cwd: finalCwd,
         autoStartOnBoot: !!autoStartOnBoot,
         autoDeleteOnExit: !!autoDeleteOnExit,
         autoRestart: !!autoRestart,
@@ -50,7 +63,7 @@ export const createInstance = (req, res) => {
 
 export const updateInstance = (req, res) => {
     const { id } = req.params;
-    const { permissions, ...updates } = req.body; // 禁止通过此 API 更新权限
+    const { permissions, dockerComposeContent, ...updates } = req.body; // 禁止通过此 API 更新权限
     
     const instances = readDb(INSTANCES_DB_PATH, []);
     const instanceIndex = instances.findIndex(i => i.id === id);
@@ -58,11 +71,25 @@ export const updateInstance = (req, res) => {
     
     // 只有管理员可以更新某些敏感字段
     if (req.session.user.role !== 'admin') {
-        const disallowedUpdates = ['autoStartOnBoot', 'autoDeleteOnExit', 'autoRestart', 'type', 'command', 'dockerConfig', 'env'];
+        const disallowedUpdates = ['autoStartOnBoot', 'autoDeleteOnExit', 'autoRestart', 'type', 'command', 'dockerConfig', 'env', 'dockerComposeContent'];
         for (const field of disallowedUpdates) {
-            if (updates[field] !== undefined && updates[field] !== instances[instanceIndex][field]) {
+             // check if updates has it (dockerComposeContent is extracted, so check variable)
+            if ((field === 'dockerComposeContent' && dockerComposeContent !== undefined) || (updates[field] !== undefined && updates[field] !== instances[instanceIndex][field])) {
                 return res.status(403).json({ message: 'server.no_field_perms' });
             }
+        }
+    }
+
+    const currentInstance = instances[instanceIndex];
+    const effectiveType = updates.type || currentInstance.type;
+    const effectiveCwd = updates.cwd || currentInstance.cwd;
+
+    if (effectiveType === 'docker_compose' && dockerComposeContent !== undefined) {
+         try {
+            fs.ensureDirSync(effectiveCwd);
+            fs.writeFileSync(path.join(effectiveCwd, 'docker-compose.yml'), dockerComposeContent);
+        } catch (error) {
+            return res.status(500).json({ message: 'server.docker_compose_config_save_failed', error: error.message });
         }
     }
 
@@ -152,4 +179,14 @@ export const updateInstancePermissions = (req, res) => {
 export const getInstancePermissions = (req, res) => {
     const instance = req.instanceConfig; // 从中间件获取
     res.json(instance.permissions || {});
+};
+
+export const getComposeContainers = async (req, res) => {
+    try {
+        const containers = await instanceManager.getDockerComposeContainers(req.params.id);
+        res.json(containers);
+    } catch (error) {
+        console.error('Failed to get compose containers:', error);
+        res.status(500).json({ message: 'server.docker_compose_ps_failed', error: error.message });
+    }
 };

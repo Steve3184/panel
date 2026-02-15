@@ -23,6 +23,8 @@ const props = defineProps({
   }
 });
 
+const emit = defineEmits(['has-content']);
+
 const terminalContainer = ref(null);
 const websocketStore = useWebSocketStore();
 let term = null;
@@ -34,6 +36,17 @@ const resizeTerminal = useDebounceFn(() => {
     fitAddon.fit();
   }
 }, 100);
+
+const triggerResize = () => {
+  if (fitAddon) {
+    fitAddon.fit();
+  }
+  if (term) {
+    websocketStore.sendMessage({ type: 'resize', id: props.instanceId, cols: term.cols, rows: term.rows });
+  }
+};
+
+defineExpose({ triggerResize });
 
 onMounted(() => {
   term = new Terminal({
@@ -88,6 +101,9 @@ watch(() => props.instanceId, (newInstanceId, oldInstanceId) => {
 function handleSocketMessage(event) {
     const msg = JSON.parse(event.data);
     if (msg.type === 'output' && msg.id === props.instanceId && term) {
+        if (msg.data && msg.data.length > 0) {
+            emit('has-content');
+        }
         term.write(msg.data);
     }
 }

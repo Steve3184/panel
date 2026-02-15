@@ -17,16 +17,23 @@
                 <select class="form-select" id="settings-instance-type" v-model="form.type">
                   <option value="shell">{{ $t('instances.type.shell') }}</option>
                   <option value="docker">{{ $t('instances.type.container') }}</option>
+                  <option value="docker_compose">{{ $t('instances.type.docker_compose') }}</option>
                 </select>
               </div>
-              <div class="mb-3" :class="{ 'd-none': form.type === 'docker' }">
+              <div class="mb-3" :class="{ 'd-none': form.type === 'docker' || form.type === 'docker_compose' }">
                 <label for="settings-instance-command" class="form-label">{{ $t('instances.command') }}</label>
                 <input type="text" class="form-control" id="settings-instance-command" v-model="form.command"
                   :placeholder="$t('instances.command.placeholder')" :required="form.type === 'shell'">
               </div>
 
+              <!-- Docker Compose Content -->
+              <div class="mb-3" :class="{ 'd-none': form.type !== 'docker_compose' }">
+                <label for="settings-docker-compose-content" class="form-label">{{ $t('instances.docker_compose.content') }}</label>
+                <textarea class="form-control" id="settings-docker-compose-content" rows="10" v-model="form.dockerComposeContent" :placeholder="$t('instances.docker_compose.content.hint')" style="font-family: monospace;"></textarea>
+              </div>
+
               <!-- Docker 容器设置 -->
-              <div id="docker-settings-settings" :class="{ 'd-none': form.type === 'shell' }">
+              <div id="docker-settings-settings" :class="{ 'd-none': form.type === 'shell' || form.type === 'docker_compose' }">
                 <hr>
                 <h5 class="mb-3">{{ $t('instances.docker.settings') }}</h5>
                 <div class="modal-grid-row">
@@ -161,6 +168,7 @@ import { useI18n } from '../../composables/useI18n';
 import ConfirmDeleteModal from './ConfirmDeleteModal.vue';
 import PortForwardingModal from './PortForwardingModal.vue';
 import VolumeMountingModal from './VolumeMountingModal.vue';
+import api from '../../services/api';
 
 const props = defineProps({
   instance: { type: Object, required: true }
@@ -252,6 +260,18 @@ const formatVolumesDisplay = computed(() => (volumes) => {
     return volumes.join(', ');
 });
 
+const loadDockerComposeContent = async () => {
+    if (props.instance.type === 'docker_compose') {
+        try {
+            const response = await api.getFileContent(props.instance.id, 'docker-compose.yml');
+            form.value.dockerComposeContent = response.content;
+        } catch (e) {
+            form.value.dockerComposeContent = 'version: \"3\"\nservices:\n  app:\n    image: nginx:latest\n    ports:\n      - \"80:80\"\n';
+            uiStore.showToast(t('server.docker_compose_not_found'), 'warning');
+        }
+    }
+};
+
 onMounted(() => {
     modal = new bootstrap.Modal(modalEle.value);
     modalEle.value.addEventListener('hidden.bs.modal', () => {
@@ -259,6 +279,8 @@ onMounted(() => {
     });
     // Initial display based on uiStore.modals.instanceSettings
     if (uiStore.modals.instanceSettings) {
+        form.value = JSON.parse(JSON.stringify(props.instance));
+        loadDockerComposeContent();
         modal.show();
     }
 });
@@ -275,9 +297,10 @@ watch(() => props.instance, (newInstance) => {
     }
 }, { immediate: true });
 
-watch(() => uiStore.modals.instanceSettings, (isVisible) => {
+watch(() => uiStore.modals.instanceSettings, async (isVisible) => {
     if (isVisible) {
         form.value = JSON.parse(JSON.stringify(props.instance));
+        await loadDockerComposeContent();
         modal.show();
     } else {
         modal.hide();
@@ -313,6 +336,10 @@ const handleSubmit = async () => {
         uiStore.showToast(t('error.image_required'), 'danger');
         return;
     }
+    if (form.value.type === 'docker_compose' && !form.value.dockerComposeContent) {
+        uiStore.showToast(t('server.docker_compose_not_found'), 'danger');
+        return;
+    }
 
     const payload = { ...form.value };
     payload.env = envString.value.split('\n').reduce((acc, line) => {
@@ -324,8 +351,11 @@ const handleSubmit = async () => {
     if (payload.type === 'docker') {
         // Ports and volumes are already in string array format from the modals
         // No need to re-parse them here.
+    } else if (payload.type === 'docker_compose') {
+        delete payload.dockerConfig;
     } else {
         delete payload.dockerConfig;
+        delete payload.dockerComposeContent;
     }
 
     await instancesStore.updateInstance(props.instance.id, payload);

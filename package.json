@@ -16,7 +16,7 @@
     "busboy": "^1.6.0",
     "cors": "^2.8.5",
     "decompress": "^4.2.1",
-    "dockerode": "^4.0.7",
+    "dockerode": "^4.0.9",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
     "express-ws": "^5.0.2",

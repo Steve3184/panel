@@ -19,6 +19,9 @@ import { setupWebSocket } from './websocket/handler.js';
 import i18n from './utils/i18n.js';
 import { readDb } from './data/db.js';
 import { panelSettings } from './api/controllers/panelSettingsController.js';
+import { initLogger } from './utils/logger.js';
+
+initLogger();
 
 // --- 初始化 Express 和 WebSocket ---
 const app = express();

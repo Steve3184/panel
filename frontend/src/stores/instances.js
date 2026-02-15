@@ -81,9 +81,10 @@ export const useInstancesStore = defineStore('instances', () => {
     }
 
     function handleInstanceStatusChange(id, status) {
-        const instance = instances.value.find(i => i.id === id);
-        if (instance) {
-            instance.status = status;
+        const index = instances.value.findIndex(i => i.id === id);
+        if (index !== -1) {
+            instances.value[index].status = status;
+            instances.value = [...instances.value];
         }
     }
     

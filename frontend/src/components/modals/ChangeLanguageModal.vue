@@ -13,6 +13,7 @@
               <option value="auto">{{ $t('language.auto') }}</option>
               <option value="en">{{ $t('language.en') }}</option>
               <option value="zh_CN">{{ $t('language.zh_CN') }}</option>
+              <option value="zh_TW">{{ $t('language.zh_TW') }}</option>
               <option value="jp">{{ $t('language.jp') }}</option>
             </select>
           </div>

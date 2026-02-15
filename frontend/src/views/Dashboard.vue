@@ -31,13 +31,13 @@
                     <div class="d-flex justify-content-between align-items-center flex-wrap">
                         <div class="me-3 mb-2 mb-md-0">
                             <h5 class="card-title mb-1">
-                                <i :class="['me-2', instance.type === 'docker' ? 'bi bi-box-seam' : 'bi bi-terminal']"></i>
+                                <i :class="['me-2', instance.type === 'docker' ? 'bi bi-box-seam' : (instance.type === 'docker_compose' ? 'bi bi-collection' : 'bi bi-terminal')]"></i>
                                 {{ instance.name }}
                             </h5>
                             <span :class="['badge me-2', instance.status === 'running' ? 'bg-success' : 'bg-secondary']">
                                 {{ instance.status === 'running' ? $t('instances.status.running') : $t('instances.status.stopped') }}
                             </span>
-                            <small class="text-muted"><code>{{ instance.type === 'docker' ? instance.dockerConfig?.image || instance.command : instance.command }}</code></small>
+                            <small class="text-muted"><code>{{ instance.type === 'docker' ? instance.dockerConfig?.image : (instance.type === 'docker_compose' ? 'Docker Compose' : instance.command) }}</code></small>
                         </div>
                         <div class="btn-group">
                             <router-link :to="`/instance/${instance.id}`" class="btn btn-sm btn-outline-primary">{{ $t('open') }}</router-link>

@@ -22,6 +22,9 @@ router.post('/:id/action', checkInstancePermission, instanceController.handleIns
 router.get('/:instanceId/permissions', isAdmin, instanceController.getInstancePermissions);
 router.put('/:instanceId/permissions/:userId', isAdmin, instanceController.updateInstancePermissions);
 
+// --- Docker Compose ---
+router.get('/:id/containers', checkInstancePermission, instanceController.getComposeContainers);
+
 // --- 挂载文件管理路由 ---
 // 将所有 /api/instances/:instanceId/ 下的请求（匹配 fileRoutes 中定义的）
 // 转发给 fileRoutes 处理器

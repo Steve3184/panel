@@ -46,9 +46,10 @@ function monitorInstanceStats() {
             let cpu = '--';
             let memory = '--';
 
-            if (instanceConfig.type === 'docker' && instanceConfig.dockerContainerId) {
+            if ((instanceConfig.type === 'docker' && instanceConfig.dockerContainerId) || instanceConfig.type === 'docker_compose') {
+                const containerId = instanceConfig.type === 'docker' ? instanceConfig.dockerContainerId : session.pty.pid;
                 try {
-                    const container = docker.getContainer(instanceConfig.dockerContainerId);
+                    const container = docker.getContainer(containerId);
                     const statsStream = await container.stats({ stream: false });
                     const stats = statsStream;
 
@@ -57,7 +58,7 @@ function monitorInstanceStats() {
                         memory = calculateMemoryUsage(stats);
                     }
                 } catch (err) {
-                    console.warn(i18n.t('server.docker_container_stats_failed', { containerId: instanceConfig.dockerContainerId, error: err.message }));
+                    console.warn(i18n.t('server.docker_container_stats_failed', { containerId: containerId, error: err.message }));
                 }
             } else {
                 psTree(session.pty.pid, (err, children) => {

@@ -29,6 +29,11 @@
                 </router-link>
             </li>
             <li class="nav-item" v-if="sessionStore.currentUser?.role === 'admin'">
+                <router-link to="/logs" class="nav-link" active-class="active">
+                    <i class="bi bi-file-text-fill me-2"></i><span>{{ t('title.logs') }}</span>
+                </router-link>
+            </li>
+            <li class="nav-item" v-if="sessionStore.currentUser?.role === 'admin'">
                 <a href="#" class="nav-link" @click.prevent="openPanelSettings">
                     <i class="bi bi-gear-fill me-2"></i><span>{{ t('panelSettings.title') }}</span>
                 </a>
@@ -41,7 +46,7 @@
              <li class="nav-item" v-for="instance in instancesStore.instances" :key="instance.id">
                 <router-link :to="`/instance/${instance.id}`" class="nav-link d-flex justify-content-between align-items-center" active-class="active">
                     <span>
-                        <i :class="['me-2', instance.type === 'docker' ? 'bi bi-box-seam' : 'bi bi-terminal']"></i>
+                        <i :class="['me-2', instance.type === 'docker' ? 'bi bi-box-seam' : (instance.type === 'docker_compose' ? 'bi bi-collection' : 'bi bi-terminal')]"></i>
                         {{ instance.name }}
                     </span>
                     <span :class="['badge', instance.status === 'running' ? 'bg-success' : 'bg-secondary']">
@@ -58,11 +63,16 @@ import { useUiStore } from '../stores/ui';
 import { useInstancesStore } from '../stores/instances';
 import { useSessionStore } from '../stores/session';
 import { useI18n } from '../composables/useI18n';
+import { onMounted } from 'vue';
 
 const uiStore = useUiStore();
 const instancesStore = useInstancesStore();
 const sessionStore = useSessionStore();
 const { t } = useI18n();
+
+onMounted(() => {
+    instancesStore.fetchInstances();
+});
 
 const openPanelSettings = () => {
   uiStore.openModal('panelSettings')

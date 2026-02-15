@@ -20,17 +20,24 @@
                             <select class="form-select" id="create-instance-type" v-model="form.type">
                                 <option value="shell">{{ $t('instances.type.shell') }}</option>
                                 <option value="docker">{{ $t('instances.type.container') }}</option>
+                                <option value="docker_compose">{{ $t('instances.type.docker_compose') }}</option>
                             </select>
                         </div>
-                        <div class="mb-3" :class="{ 'd-none': form.type === 'docker' }">
+                        <div class="mb-3" :class="{ 'd-none': form.type === 'docker' || form.type === 'docker_compose' }">
                             <label for="create-instance-command" class="form-label">{{ $t('instances.command')
                             }}</label>
                             <input type="text" class="form-control" id="create-instance-command" v-model="form.command"
                                 :placeholder="t('instances.command.placeholder')" :required="form.type === 'shell'">
                         </div>
 
+                        <!-- Docker Compose Content -->
+                        <div class="mb-3" :class="{ 'd-none': form.type !== 'docker_compose' }">
+                            <label for="create-docker-compose-content" class="form-label">{{ $t('instances.docker_compose.content') }}</label>
+                            <textarea class="form-control" id="create-docker-compose-content" rows="10" v-model="form.dockerComposeContent" :placeholder="t('instances.docker_compose.content.hint')" style="font-family: monospace;"></textarea>
+                        </div>
+
                         <!-- Docker 容器设置 -->
-                        <div id="docker-settings-create" :class="{ 'd-none': form.type === 'shell' }">
+                        <div id="docker-settings-create" :class="{ 'd-none': form.type === 'shell' || form.type === 'docker_compose' }">
                             <hr>
                             <h5 class="mb-3">{{ $t('instances.docker.settings') }}</h5>
                             <div class="modal-grid-row">
@@ -155,6 +162,7 @@ const form = ref({
     autoStartOnBoot: false,
     autoDeleteOnExit: false,
     env: '', // Changed to string for textarea
+    dockerComposeContent: '',
     dockerConfig: {
         image: 'ubuntu:latest',
         containerName: '',
@@ -301,6 +309,10 @@ const submitForm = async () => {
         uiStore.showToast(t('error.image_required'), 'danger');
         return;
     }
+    if (form.value.type === 'docker_compose' && !form.value.dockerComposeContent) {
+        uiStore.showToast(t('server.docker_compose_not_found'), 'danger');
+        return;
+    }
 
     const payload = { ...form.value };
     payload.env = parseEnvString(form.value.env);
@@ -310,6 +322,8 @@ const submitForm = async () => {
         // No need to re-parse them here.
         // payload.dockerConfig.ports = payload.dockerConfig.ports.map(parsePortString).filter(p => p !== null);
         // payload.dockerConfig.volumes = payload.dockerConfig.volumes.map(parseVolumeString).filter(v => v !== null);
+    } else if (payload.type === 'docker_compose') {
+        delete payload.dockerConfig;
     } else {
         delete payload.dockerConfig;
     }

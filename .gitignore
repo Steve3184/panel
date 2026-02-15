@@ -6,4 +6,5 @@ workspaces/
 sessions/
 package-lock.json
 src/utils/frpc_*
+logs/
 .clinic/

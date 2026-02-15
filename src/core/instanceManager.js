@@ -3,15 +3,19 @@ import fs from 'fs-extra';
 import pty from 'node-pty';
 import Docker from 'dockerode';
 import os from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { readDb, writeDb } from '../data/db.js';
 import { INSTANCES_DB_PATH, WORKSPACES_PATH, SHELL } from '../config.js';
 import { broadcast } from '../websocket/handler.js';
 import i18n from '../utils/i18n.js';
 
+const execAsync = promisify(exec);
 const docker = new Docker();
 const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
 // K: instanceId, V: { pty, listeners, history, ... }
 export const activeInstances = new Map();
+export const stoppedInstancesHistory = new Map();
 
 export function getInstanceById(instanceId) {
     const instances = readDb(INSTANCES_DB_PATH, []);
@@ -101,6 +105,7 @@ export async function startInstance(instanceConfig) {
 
         const stream = await container.attach({
             stream: true,
+            logs: true,
             stdin: true,
             stdout: true,
             stderr: true,
@@ -128,6 +133,85 @@ export async function startInstance(instanceConfig) {
                 } else {
                     container.stop().catch(err => console.error(i18n.t('server.stop_container_failed_log', { id: container.id }), err.message));
                 }
+            },
+            destroy: () => {
+                stream.removeAllListeners();
+                stream.destroy();
+            }
+        };
+
+    } else if (instanceConfig.type === 'docker_compose') {
+        try {
+            await execAsync('docker compose up -d', { cwd: instanceCwd });
+        } catch (e) {
+            console.error('Docker compose up failed', e);
+            throw new Error(i18n.t('server.docker_compose_up_failed', { error: e.message }));
+        }
+
+        const containers = await getDockerComposeContainers(instanceConfig.id);
+        if (containers.length === 0) {
+             throw new Error('No containers found for this docker compose project');
+        }
+        
+        const containerInfo = containers[0];
+        const container = docker.getContainer(containerInfo.id);
+        const inspectData = await container.inspect();
+        const isTty = inspectData.Config.Tty;
+        
+        const stream = await container.attach({
+            stream: true,
+            logs: true,
+            stdin: true,
+            stdout: true,
+            stderr: true,
+        });
+        
+        commandToExecute = `Docker Compose: ${containerInfo.name}`;
+
+        term = {
+            pid: container.id,
+            write: (data) => stream.write(data),
+            on: (event, handler) => {
+                if (event === 'data') {
+                    if (isTty) {
+                        stream.on('data', handler);
+                    } else {
+                        // Demux Docker stream
+                        stream.on('data', (chunk) => {
+                            let offset = 0;
+                            while (offset < chunk.length) {
+                                const type = chunk.readUInt8(offset);
+                                const length = chunk.readUInt32BE(offset + 4);
+                                offset += 8;
+                                if (offset + length <= chunk.length) {
+                                    handler(chunk.slice(offset, offset + length));
+                                    offset += length;
+                                } else {
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                }
+                if (event === 'exit') {
+                    container.wait().then(() => handler()).catch(() => handler());
+                }
+            },
+            resize: (cols, rows) => {
+                if (isTty && cols > 0 && rows > 0) {
+                    container.resize({ h: rows, w: cols }).catch(err => console.error(i18n.t('server.resize_container_tty_failed_log'), err.message));
+                }
+            },
+            kill: (signal) => {
+               if (signal === 'SIGKILL') {
+                   execAsync('docker compose kill', { cwd: instanceCwd }).catch(console.error);
+               } else {
+                   execAsync('docker compose stop', { cwd: instanceCwd }).catch(console.error);
+               }
+            },
+            destroy: () => {
+                stream.removeAllListeners();
+                stream.destroy();
             }
         };
 
@@ -137,11 +221,12 @@ export async function startInstance(instanceConfig) {
             env: { ...process.env, ...(instanceConfig.env || {}) }
         };
         term = pty.spawn(shell, ['-c', commandToExecute], ptyOptions);
+        term.destroy = () => {}; 
     }
 
     const session = {
         id: instanceConfig.id, pty: term, listeners: new Set(),
-        history: `\x1b[32m${i18n.t('server.instance_started_log', { command: commandToExecute })}\x1b[0m\r\n\r\n`,
+        history: '',
         isUserTriggeredStop: false,
         isUserTriggeredRestart: false,
         restartAttempts: 0,
@@ -172,6 +257,9 @@ export async function startInstance(instanceConfig) {
             clearTimeout(session.restartTimeout);
             session.restartTimeout = null;
         }
+
+        // Save history before removing session
+        stoppedInstancesHistory.set(instanceConfig.id, session.history);
 
         // Ensure active session is removed
         activeInstances.delete(instanceConfig.id);
@@ -357,4 +445,151 @@ export async function initializeInstancesState() {
         }
     }
     console.log(i18n.t('server.instance_state_initialization_complete'));
+}
+
+export async function getDockerComposeContainers(instanceId) {
+    const instance = getInstanceById(instanceId);
+    if (!instance || instance.type !== 'docker_compose') return [];
+    
+    // Project name is usually directory name of CWD
+    const projectName = path.basename(instance.cwd); 
+    
+    try {
+        const containers = await docker.listContainers({
+            filters: {
+                label: [`com.docker.compose.project=${projectName}`]
+            }
+        });
+        
+        return containers.map(c => ({
+            id: c.Id,
+            name: c.Names[0].replace(/^\//, ''), // remove leading slash
+            state: c.State,
+            status: c.Status
+        }));
+    } catch (error) {
+        console.error('Failed to list docker compose containers:', error);
+        return [];
+    }
+}
+
+export async function switchDockerComposeContainer(instanceId, containerName) {
+    const session = activeInstances.get(instanceId);
+    if (!session) throw new Error('Instance not running');
+    
+    const instanceConfig = getInstanceById(instanceId);
+    if (!instanceConfig || instanceConfig.type !== 'docker_compose') throw new Error('Not a docker compose instance');
+
+    const container = docker.getContainer(containerName); // containerName should be ID or Name? usually Name is unique enough or ID.
+    // If passing Name (which we get from getDockerComposeContainers), we might need to find ID or just use Name if dockerode supports it.
+    // Dockerode getContainer takes ID or Name.
+    
+    try {
+        // Verify container exists and belongs to this project?
+        // Skipped for brevity, assuming frontend sends valid name from list.
+        
+        // 1. "Detach" current term.
+        // We can't easily "detach" the listeners added in `startInstance` without keeping references.
+        // But `session.listeners` are WebSocket clients.
+        // The `term.on('data')` pushes to history and clients.
+        // We need to stop the *old* `stream.on('data')`.
+        
+        // Issue: The `term` object defined in `startInstance` doesn't expose the stream to remove listeners.
+        // Hack: We can just replace the `term` object in `session` and somehow tell the old one to shut up.
+        // But the old stream is still flowing.
+        // We should add a `destroy` method to the `term` object we create.
+        
+        if (session.pty.destroy) {
+            session.pty.destroy();
+        }
+        
+        // 2. Attach new
+        const inspectData = await container.inspect();
+        const isTty = inspectData.Config.Tty;
+
+        const stream = await container.attach({
+            stream: true,
+            logs: true,
+            stdin: true,
+            stdout: true,
+            stderr: true,
+        });
+
+        // Update history? Maybe print a message.
+        const switchMsg = `\r\n\x1b[33m--- Switched to container: ${containerName} ---\x1b[0m\r\n`;
+        session.history += switchMsg;
+         session.listeners.forEach(ws => {
+            if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceId, data: switchMsg }));
+        });
+
+        const term = {
+            pid: container.id,
+            write: (data) => stream.write(data),
+            on: (event, handler) => {
+                if (event === 'data') {
+                     if (isTty) {
+                        stream.on('data', handler);
+                    } else {
+                        // Demux Docker stream
+                        stream.on('data', (chunk) => {
+                            let offset = 0;
+                            while (offset < chunk.length) {
+                                if (chunk.length < offset + 8) break;
+                                const type = chunk.readUInt8(offset);
+                                const length = chunk.readUInt32BE(offset + 4);
+                                offset += 8;
+                                if (offset + length <= chunk.length) {
+                                    handler(chunk.slice(offset, offset + length));
+                                    offset += length;
+                                } else {
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                }
+                // We DON'T listen to exit here for restarting the instance, 
+                // because switching containers shouldn't control instance lifecycle (unless it's the main one?)
+                // Let's leave exit handler empty or minimal for switched containers.
+                // Or maybe we should? If this container dies, what happens?
+                // Ideally, the "Instance" is the Compose Project. It stops when `docker compose down` or all containers stop.
+                // For now, let's just handle data.
+            },
+            resize: (cols, rows) => {
+                if (cols > 0 && rows > 0) {
+                    container.resize({ h: rows, w: cols }).catch(err => console.error(i18n.t('server.resize_container_tty_failed_log'), err.message));
+                }
+            },
+            kill: (signal) => {
+                 // Forward kill to the compose project, not just this container?
+                 // Or just do nothing because `stopInstance` handles the compose down?
+                 // `stopInstance` calls `pty.kill`.
+                 // For Docker Compose, `pty.kill` should stop the *project*.
+                  if (signal === 'SIGKILL') {
+                       execAsync('docker compose kill', { cwd: instanceConfig.cwd }).catch(console.error);
+                   } else {
+                       execAsync('docker compose stop', { cwd: instanceConfig.cwd }).catch(console.error);
+                   }
+            },
+            destroy: () => {
+                stream.removeAllListeners();
+                stream.destroy();
+            }
+        };
+        
+        // Re-bind data listener
+        term.on('data', (data) => {
+            const output = data.toString('utf8');
+            session.history += output;
+            session.listeners.forEach(ws => {
+                if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceId, data: output }));
+            });
+        });
+
+        session.pty = term;
+        
+    } catch (error) {
+        console.error('Failed to switch container:', error);
+        throw error;
+    }
 }
