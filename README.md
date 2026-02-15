@@ -58,34 +58,47 @@ A desktop-class file manager directly in your browser.
 ## 🚀 Quick Start
 
 ### Prerequisites
-*   **Node.js**: v22 or higher
 *   **Unzip**: For extracting releases
 *   **Docker**: (Optional) For container management
 *   **7-Zip**: (Optional) For advanced archiving features
 
+**Note**: Node.js is **NOT** required when using pre-built releases, as they include all dependencies.
+
 ### Installation
 
 #### Option 1: Install from Release (Recommended) ⚡
-*Fastest deployment. No building required.*
+*Fastest deployment. No build tools required.*
 
+**For Linux x64:**
 ```bash
-# 1. Install Node.js 22 and tools
-curl -sL https://deb.nodesource.com/setup_22.x | bash -
-sudo apt install -y nodejs unzip
+# 1. Install unzip and wget
+sudo apt install -y unzip wget
 
 # 2. Download and extract
 sudo mkdir -p /opt/panel && cd /opt/panel
-sudo wget https://github.com/Steve3184/panel/releases/download/latest-build/release.zip
-sudo unzip release.zip && sudo rm release.zip
+sudo wget https://github.com/Steve3184/panel/releases/download/latest/release-linux-x64.zip
+sudo unzip release-linux-x64.zip && sudo rm release-linux-x64.zip
 
-# 3. Install dependencies
-sudo npm install --prod
-
-# 4. Setup Systemd Service
+# 3. Setup Systemd Service
 sudo wget -O /etc/systemd/system/panel.service https://raw.githubusercontent.com/Steve3184/panel/main/panel.service
 sudo systemctl daemon-reload
 sudo systemctl enable panel
 sudo systemctl start panel
+```
+
+**For Linux ARM64:**
+```bash
+# Use release-linux-arm64.zip instead
+sudo wget https://github.com/Steve3184/panel/releases/download/latest/release-linux-arm64.zip
+sudo unzip release-linux-arm64.zip && sudo rm release-linux-arm64.zip
+# ...
+```
+
+**For Windows x64:**
+```powershell
+# Download release-win-x64.zip from:
+# https://github.com/Steve3184/panel/releases/download/latest/release-win-x64.zip
+# Extract and run: node src/server.js
 ```
 
 #### Option 2: Build from Source 🛠️
@@ -110,7 +123,8 @@ sudo systemctl start panel
     ```bash
     npm install
     cd frontend && npm install
-    npm run build --prefix frontend
+    npm run build
+    cd ..
     ```
 
 4.  **Configure Service:**
