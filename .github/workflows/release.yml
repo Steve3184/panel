@@ -10,53 +10,128 @@ permissions:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            artifact_name: linux-x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            artifact_name: linux-arm64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            artifact_name: win-x64
+    
+    runs-on: ${{ matrix.os }}
+    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Install backend dependencies
+        run: npm install
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_platform: ${{ matrix.platform }}
+      
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: ./frontend
+      
+      - name: Build frontend
+        run: npm run build
+        working-directory: ./frontend
+      
+      - name: Create Backend Release Archive
+        shell: bash
+        run: |
+          mkdir -p release
+          
+          cp -r src release/
+          cp -r node_modules release/
+          cp package.json release/
+          cp LICENSE release/
+          
+          mkdir -p release/frontend/public
+          cp -r frontend/dist release/frontend/
+          cp -r frontend/public/lang release/frontend/public/
+          cp LICENSE release/frontend/dist/
+          
+          cd release
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            7z a -tzip ../release-${{ matrix.artifact_name }}.zip .
+          else
+            zip -r ../release-${{ matrix.artifact_name }}.zip .
+          fi
+      
+      - name: Create Frontend Release Archive
+        if: matrix.artifact_name == 'linux-x64'
+        shell: bash
+        run: |
+          cd frontend/dist
+          cp ../../LICENSE .
+          zip -r ../../release-frontend.zip .
+      
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.artifact_name }}
+          path: release-${{ matrix.artifact_name }}.zip
+          retention-days: 1
+      
+      - name: Upload frontend artifact
+        if: matrix.artifact_name == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-frontend
+          path: release-frontend.zip
+          retention-days: 1
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22'
-
-    - name: Install dependencies
-      run: npm install
-      working-directory: ./frontend
-
-    - name: Build frontend
-      run: npm run build
-      working-directory: ./frontend
-
-    - name: Create Release Archive
-      run: |
-        mkdir -p build/frontend/public
-        cp -r src build/
-        cp -r frontend/dist build/frontend/dist
-        cp -r frontend/public/lang build/frontend/public/lang
-        cp LICENSE build/
-        cp package.json build/
-        cd build && zip -r ../release.zip . && cd ..
-        cp LICENSE build/frontend/dist/
-        cd build/frontend/dist && zip -r ../../../frontend_release.zip . && cd ..
-
-    - name: Update Tag
-      uses: richardsimko/update-tag@v1
-      with:
-        tag_name: latest-build
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: latest-build
-        name: Latest Build
-        files: |
-          release.zip
-          frontend_release.zip
-        overwrite_files: true
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  create-release:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build #${{ github.run_number }}
+          files: |
+            artifacts/release-linux-x64/release-linux-x64.zip
+            artifacts/release-linux-arm64/release-linux-arm64.zip
+            artifacts/release-win-x64/release-win-x64.zip
+            artifacts/frontend-release/release-frontend.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Update latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          files: |
+            artifacts/release-linux-x64/release-linux-x64.zip
+            artifacts/release-linux-arm64/release-linux-arm64.zip
+            artifacts/release-win-x64/release-win-x64.zip
+            artifacts/frontend-release/release-frontend.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
