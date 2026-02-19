@@ -23,6 +23,16 @@ function getOrCreateWebDAVServer(instanceId, instancePath) {
     const server = new webdav.WebDAVServer();
     server.setFileSystem('/' + instanceId + '/', new webdav.PhysicalFileSystem(instancePath));
 
+    server.afterRequest((arg, next) => {
+        if (arg.request.method === 'PROPFIND' && arg.responseBody) {
+            const bodyString = arg.responseBody.toString();
+            const searchPattern = new RegExp(`/api/dav/${instanceId}`, 'g');
+            arg.responseBody = bodyString.replace(searchPattern, `/api/dav/${instanceId}`);
+            console.log(arg.responseBody)
+        }
+        next();
+    });
+
     webdavServers.set(instanceId, server);
     return server;
 }

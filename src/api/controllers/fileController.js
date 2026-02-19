@@ -639,7 +639,7 @@ export const copyFiles = async (req, res) => {
     try {
         const { instanceId } = req.params;
         const { files, destination } = req.body;
-        if (!files?.length || !destination) {
+        if (!files?.length) {
             return res.status(400).json({ message: 'server.missing_copy_details' });
         }
 
@@ -697,8 +697,6 @@ export const deleteMultipleFiles = async (req, res) => {
             }
 
             await fs.remove(absolutePath); // 删除文件或目录
-            deletedItems.push(relativePath);
-
         });
 
         await Promise.all(deleteOperations);
@@ -720,7 +718,7 @@ export const moveFiles = async (req, res) => {
     try {
         const { instanceId } = req.params;
         const { files, destination } = req.body;
-        if (!files?.length || !destination) {
+        if (!files?.length) {
             return res.status(400).json({ message: 'server.missing_move_details' });
         }
 

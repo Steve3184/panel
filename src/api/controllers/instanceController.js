@@ -30,9 +30,14 @@ export const createInstance = (req, res) => {
     const id = uuidv4();
     const finalCwd = cwd || path.join(WORKSPACES_PATH, id);
 
+    try {
+        fs.ensureDirSync(finalCwd);
+    } catch (error) {
+        return res.status(500).json({ message: 'server.failed_to_create_file', error: error.message });
+    }
+
     if (type === 'docker_compose') {
         try {
-            fs.ensureDirSync(finalCwd);
             fs.writeFileSync(path.join(finalCwd, 'docker-compose.yml'), dockerComposeContent);
         } catch (error) {
             return res.status(500).json({ message: 'server.failed_to_create_file', error: error.message });

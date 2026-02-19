@@ -168,6 +168,12 @@ export async function startInstance(instanceConfig) {
         
         commandToExecute = `Docker Compose: ${containerInfo.name}`;
 
+        const normalizeOutput = (data) => {
+            let str = data.toString('utf8');
+            str = str.replace(/\r(?!\n)/g, '\r\n');
+            return Buffer.from(str, 'utf8');
+        };
+
         term = {
             pid: container.id,
             write: (data) => stream.write(data),
@@ -176,25 +182,21 @@ export async function startInstance(instanceConfig) {
                     if (isTty) {
                         stream.on('data', handler);
                     } else {
-                        // Demux Docker stream
-                        stream.on('data', (chunk) => {
-                            let offset = 0;
-                            while (offset < chunk.length) {
-                                const type = chunk.readUInt8(offset);
-                                const length = chunk.readUInt32BE(offset + 4);
-                                offset += 8;
-                                if (offset + length <= chunk.length) {
-                                    handler(chunk.slice(offset, offset + length));
-                                    offset += length;
-                                } else {
-                                    break;
-                                }
-                            }
-                        });
+                        const { PassThrough } = require('stream');
+                        const stdout = new PassThrough();
+                        const stderr = new PassThrough();
+
+                        docker.modem.demuxStream(stream, stdout, stderr);
+
+                        stdout.on('data', normalizeOutput(handler));
+                        stderr.on('data', normalizeOutput(handler));
                     }
                 }
+
                 if (event === 'exit') {
-                    container.wait().then(() => handler()).catch(() => handler());
+                    container.wait()
+                        .then(() => handler())
+                        .catch(() => handler());
                 }
             },
             resize: (cols, rows) => {
