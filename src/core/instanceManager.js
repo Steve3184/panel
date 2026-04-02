@@ -43,7 +43,7 @@ export async function startInstance(instanceConfig) {
         if (!image) throw new Error(`Docker 实例 ${instanceConfig.name} 未指定镜像 (image)`);
 
         const execCommand = dockerConfig.command ? dockerConfig.command.split(/\s+/) : null;
-        let effectiveCwd = dockerConfig.workingDir || '/workspace';
+        const effectiveCwd = dockerConfig.workingDir || null;
         let container;
         let attachMode = false;
 
@@ -72,21 +72,24 @@ export async function startInstance(instanceConfig) {
                 exposedPorts[`${containerPort || hostPort}/${containerProtocol ? 'udp' : 'tcp'}`] = {};
             });
 
-            const binds = [`${instanceCwd}:${effectiveCwd}`];
+            const binds = [];
+            if (effectiveCwd) binds.push(`${instanceCwd}:${effectiveCwd}`);
             (dockerConfig.volumes || []).forEach(volume => binds.push(volume));
 
+            const createOpts = {
+                Image: image,
+                name: containerName,
+                Tty: true,
+                OpenStdin: true,
+                HostConfig: { Binds: binds, PortBindings: portBindings, AutoRemove: true },
+                ExposedPorts: exposedPorts,
+                Env: Object.entries(instanceConfig.env || {}).map(([key, value]) => `${key}=${value}`),
+                Cmd: execCommand,
+            };
+            if (effectiveCwd) createOpts.WorkingDir = effectiveCwd;
+
             try {
-                container = await docker.createContainer({
-                    Image: image,
-                    name: containerName,
-                    Tty: true,
-                    OpenStdin: true,
-                    WorkingDir: effectiveCwd,
-                    HostConfig: { Binds: binds, PortBindings: portBindings, AutoRemove: true },
-                    ExposedPorts: exposedPorts,
-                    Env: Object.entries(instanceConfig.env || {}).map(([key, value]) => `${key}=${value}`),
-                    Cmd: execCommand,
-                });
+                container = await docker.createContainer(createOpts);
                 await container.start();
                 console.log(i18n.t('server.new_container_created_and_started', { containerName: containerName, id: container.id }));
             } catch (err) {
