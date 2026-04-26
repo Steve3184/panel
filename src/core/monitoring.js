@@ -76,8 +76,10 @@ function monitorInstanceStats() {
                             return;
                         }
                         const totalStats = Object.values(stats).reduce((acc, current) => {
-                            acc.cpu += current.cpu;
-                            acc.memory += current.memory;
+                            if (current) {
+                                acc.cpu += current.cpu;
+                                acc.memory += current.memory;
+                            }
                             return acc;
                         }, { cpu: 0, memory: 0 });
 
