@@ -56,7 +56,12 @@ async function handleMessage(ws, messageData) {
                     }
                     ws.subscribedInstanceId = message.id;
                     instance.listeners.add(ws);
-                    send(ws, { type: 'output', id: message.id, data: instance.history });
+                    // 限制历史记录发送量为 4KB
+                    const MAX_HISTORY_SIZE = 4096;
+                    const historyData = instance.history.length > MAX_HISTORY_SIZE 
+                        ? instance.history.slice(-MAX_HISTORY_SIZE) 
+                        : instance.history;
+                    send(ws, { type: 'output', id: message.id, data: historyData });
                 } else if (stoppedInstancesHistory.has(message.id)) {
                      // Check permission for stopped instance as well
                     if (!checkUserInstancePermission(ws.user, message.id, 'read-only', false)) {
@@ -64,7 +69,12 @@ async function handleMessage(ws, messageData) {
                         return;
                     }
                     const history = stoppedInstancesHistory.get(message.id);
-                    send(ws, { type: 'output', id: message.id, data: history });
+                    // 限制历史记录发送量为 4KB
+                    const MAX_HISTORY_SIZE = 4096;
+                    const historyData = history.length > MAX_HISTORY_SIZE 
+                        ? history.slice(-MAX_HISTORY_SIZE) 
+                        : history;
+                    send(ws, { type: 'output', id: message.id, data: historyData });
                 }
                 break;
             case 'unsubscribe':

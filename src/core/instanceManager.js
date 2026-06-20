@@ -245,8 +245,14 @@ export async function startInstance(instanceConfig) {
     term.on('data', (data) => {
         const output = data.toString('utf8');
         session.history += output;
+        // 限制每次发送的数据量为 4KB
+        const MAX_OUTPUT_SIZE = 4096;
+        const truncatedOutput = output.length > MAX_OUTPUT_SIZE 
+            ? output.slice(-MAX_OUTPUT_SIZE) 
+            : output;
+        console.log(`[WS Output] Original: ${output.length} bytes, Sent: ${truncatedOutput.length} bytes`);
         session.listeners.forEach(ws => {
-            if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceConfig.id, data: output }));
+            if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceConfig.id, data: truncatedOutput }));
         });
     });
 
