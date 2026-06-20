@@ -7,6 +7,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
+import { randomBytes } from 'crypto';
 import { EventEmitter } from 'events';
 
 import { VUE_DIST_PATH, USERS_DB_PATH, DB_PATH, WORKSPACES_PATH, UPLOAD_TEMP_DIR } from './config.js';
@@ -31,10 +32,18 @@ expressWs(app, server);
 // --- 配置中间件 ---
 app.use(express.json()); // 解析 JSON 请求体
 
-// 允许所有来源的跨域请求
-app.use(cors());
+// 配置 CORS - 默认同源，可通过 CORS_ORIGIN 环境变量配置
+const corsOrigin = process.env.CORS_ORIGIN || true;
+app.use(cors({ origin: corsOrigin, credentials: true }));
 
 const FileStore = FileStoreFactory(session);
+
+// 生成随机会话密钥作为业务用密钥
+const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
+if (!process.env.SESSION_SECRET) {
+    console.warn('WARNING: SESSION_SECRET environment variable not set. Using a randomly generated secret. For multi-server deployments, set SESSION_SECRET to a consistent value.');
+}
+const isHttps = process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true';
 
 const sessionParser = session({
     store: new FileStore({
@@ -46,10 +55,10 @@ const sessionParser = session({
         maxTimeout: 100,
         logFn: function(){}
     }),
-    secret: process.env.SESSION_SECRET || 'a-very-secret-key-that-should-be-in-env-vars',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // 在生产环境中应设为 true 并使用 HTTPS
+    cookie: { secure: isHttps }
 })
 
 app.use(sessionParser);
@@ -85,6 +94,11 @@ app.use((req, res, next) => {
 
 // --- API 路由 ---
 app.use('/api', apiRouter);
+
+// API 404 未匹配的路由 -> 返回 JSON 而非 HTML
+app.use('/api', (req, res) => {
+    res.status(404).json({ message: 'server.api_not_found' });
+});
 
 // --- WebSocket 设置 ---
 setupWebSocket(app, sessionParser);

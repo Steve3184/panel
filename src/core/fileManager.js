@@ -23,7 +23,7 @@ export function getFileAbsolutePath(instanceId, relativePath = '') {
     const instanceCwd = instance.cwd || path.join(WORKSPACES_PATH, instanceId);
     const absolutePath = path.join(instanceCwd, relativePath);
 
-    if (!absolutePath.startsWith(instanceCwd)) {
+    if (absolutePath !== instanceCwd && !absolutePath.startsWith(instanceCwd + path.sep)) {
         throw new Error('Access denied: Path outside of instance working directory.');
     }
 

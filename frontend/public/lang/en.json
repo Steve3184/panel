@@ -615,5 +615,6 @@
   "websocket.connection.lost": "Connection to the server has been lost. Reconnecting...",
   "websocket.error": "WebSocket Error:",
   "websocket.established": "Backend WebSocket connection successful",
-  "websocket.lost": "Backend WebSocket connection lost!"
+  "websocket.lost": "Backend WebSocket connection lost!",
+  "server.too_many_login_attempts": "Too many login attempts. Please try again later."
 }

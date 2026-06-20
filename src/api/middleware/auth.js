@@ -36,6 +36,7 @@ export const isAuthenticated = (req, res, next) => {
         }
         return res.redirect('/login');
     }
+    req.user = req.session.user;
     next();
 };
 

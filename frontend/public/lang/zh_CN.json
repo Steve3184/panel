@@ -615,5 +615,6 @@
     "websocket.connection.lost": "与服务器的连接已断开。正在重新连接...",
     "websocket.error": "WebSocket 错误:",
     "websocket.established": "后端 ws 链接成功",
-    "websocket.lost": "后端ws连接异常!"
+    "websocket.lost": "后端ws连接异常!",
+    "server.too_many_login_attempts": "登录尝试次数过多，请稍后重试。"
 }
