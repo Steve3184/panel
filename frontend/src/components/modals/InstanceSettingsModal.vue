@@ -361,15 +361,27 @@ const handleSubmit = async () => {
     const isAdmin = sessionStore.currentUser?.role === 'admin';
     const payload = isAdmin ? { ...form.value } : { name: form.value.name };
     if (isAdmin) {
+      // Strip fields not in the backend allowlist to avoid the no_field_perms 403.
+      // The serializer returns id, permissions, status (and dockerContainerId for
+      // running docker instances) which updateInstance does not accept.
+      delete payload.id;
+      delete payload.permissions;
+      delete payload.status;
+      delete payload.dockerContainerId;
+
       payload.env = envString.value.split('\n').reduce((acc, line) => {
           const [key, ...val] = line.split('=');
           if (key) acc[key] = val.join('=');
           return acc;
       }, {});
+
       if (payload.type === 'docker_compose') {
         delete payload.dockerConfig;
       } else if (payload.type === 'shell') {
         delete payload.dockerConfig;
+        delete payload.dockerComposeContent;
+      } else {
+        // docker type — compose content is irrelevant
         delete payload.dockerComposeContent;
       }
     }

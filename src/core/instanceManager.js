@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs-extra';
 import pty from 'node-pty';
 import Docker from 'dockerode';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { PassThrough } from 'stream';
 import { readDb, writeDb } from '../data/db.js';
@@ -15,7 +15,122 @@ import i18n from '../utils/i18n.js';
 
 const execAsync = promisify(exec);
 const docker = new Docker();
-// K: instanceId, V: { pty, listeners, history, ... }
+
+/**
+ * Run a `docker compose` sub-command with real-time output streaming and a
+ * hard timeout.  Never resolves until the process exits (or is killed).
+ *
+ * @param {string[]} args       e.g. ['up', '-d'] or ['stop', '--timeout', '10']
+ * @param {string}   cwd        Directory containing docker-compose.yml
+ * @param {function} [onOutput] Called with each stdout/stderr chunk as a string
+ * @param {number}   [timeoutMs=300_000]  Kill the process after this many ms
+ */
+function spawnDockerCompose(args, cwd, onOutput, timeoutMs = 300_000) {
+    return new Promise((resolve, reject) => {
+        const proc = spawn('docker', ['compose', ...args], { cwd });
+        let timedOut = false;
+
+        const timer = setTimeout(() => {
+            timedOut = true;
+            proc.kill('SIGKILL');
+            reject(new Error(`docker compose ${args[0]} timed out after ${timeoutMs / 1000}s`));
+        }, timeoutMs);
+
+        proc.stdout.on('data', (data) => onOutput?.(data.toString('utf8')));
+        proc.stderr.on('data', (data) => onOutput?.(data.toString('utf8')));
+
+        proc.on('close', (code) => {
+            clearTimeout(timer);
+            if (timedOut) return;
+            if (code === 0 || code === null) resolve();
+            else reject(new Error(`docker compose ${args[0]} exited with code ${code}`));
+        });
+
+        proc.on('error', (err) => {
+            clearTimeout(timer);
+            if (!timedOut) reject(err);
+        });
+    });
+}
+
+/**
+ * Stop or kill all containers belonging to a docker_compose instance using the
+ * Docker API (no shell required).  Falls back to the CLI only if the container
+ * list is empty (e.g. labels are missing on an older project).
+ *
+ * @param {string} instanceId
+ * @param {string} instanceCwd  Resolved working directory (never undefined)
+ * @param {string} signal       'SIGKILL' | anything else → graceful stop
+ */
+async function stopDockerComposeContainers(instanceId, instanceCwd, signal) {
+    try {
+        const containers = await getDockerComposeContainers(instanceId);
+        if (containers.length > 0) {
+            await Promise.all(containers.map(async ({ id }) => {
+                try {
+                    const c = docker.getContainer(id);
+                    if (signal === 'SIGKILL') {
+                        await c.kill();
+                    } else {
+                        await c.stop({ t: 10 });
+                    }
+                } catch (err) {
+                    // 304 = already stopped, 404 = already removed — both are fine
+                    if (err.statusCode !== 304 && err.statusCode !== 404) {
+                        console.error(`Failed to stop compose container ${id}:`, err.message);
+                    }
+                }
+            }));
+            return;
+        }
+    } catch (err) {
+        console.warn('Dockerode compose stop failed, falling back to CLI:', err.message);
+    }
+    // Fallback: container list empty or lookup failed — use the CLI with a 60s timeout
+    const subCmd = signal === 'SIGKILL' ? ['kill'] : ['stop', '--timeout', '10'];
+    await spawnDockerCompose(subCmd, instanceCwd, null, 60_000).catch(console.error);
+}
+
+/**
+ * Clean up docker compose startup output for display in xterm.js history.
+ *
+ * `docker compose up` emits interactive progress via `\r` (carriage return) to
+ * overwrite the current line, optionally preceded by spaces to clear the previous
+ * text.  When stored verbatim and replayed in xterm.js, this produces staircase
+ * indentation.  This function:
+ *   1. Strips ANSI/VT100 escape sequences (colours, cursor movement, etc.)
+ *   2. Simulates carriage return: when a `\r` is encountered, the buffered line is
+ *      discarded so the next write wins (mimicking a real terminal overwrite).
+ *   3. Drops blank lines that result from cleared progress lines.
+ */
+function cleanComposeOutput(raw) {
+    // Strip all ANSI escape sequences (CSI, OSC, single-char, etc.)
+    const stripped = raw
+        .replace(/\x1B\[[0-9;]*[A-Za-z]/g, '')   // CSI sequences (colours, cursor)
+        .replace(/\x1B[()][AB0-3]/g, '')           // Character-set designations
+        .replace(/\x1B[=>]/g, '')                  // Application/normal keypad
+        .replace(/\x1B./g, '');                    // Any remaining two-char escapes
+
+    const lines = [];
+    let cur = '';
+    for (let i = 0; i < stripped.length; i++) {
+        const ch = stripped[i];
+        if (ch === '\n') {
+            lines.push(cur);
+            cur = '';
+        } else if (ch === '\r') {
+            // Discard buffered content — the next write starts from column 0
+            cur = '';
+        } else {
+            cur += ch;
+        }
+    }
+    if (cur) lines.push(cur);
+
+    return lines
+        .filter(l => l.trim().length > 0)
+        .join('\n') + '\n';
+}
 export const activeInstances = new Map();
 export const stoppedInstancesHistory = new Map();
 
@@ -37,6 +152,8 @@ export async function startInstance(instanceConfig) {
 
     let term;
     let commandToExecute = instanceConfig.command;
+    // Startup output captured for docker_compose; prepended to session history.
+    let composeStartupOutput = '';
 
     if (instanceConfig.type === 'docker') {
         const dockerConfig = instanceConfig.dockerConfig || {};
@@ -146,23 +263,42 @@ export async function startInstance(instanceConfig) {
         };
 
     } else if (instanceConfig.type === 'docker_compose') {
-        try {
-            await execAsync('docker compose up -d', { cwd: instanceCwd });
-        } catch (e) {
-            console.error('Docker compose up failed', e);
-            throw new Error(i18n.t('server.docker_compose_up_failed', { error: e.message }));
+        // Check whether the project's containers are already running. If they
+        // are, we skip `docker compose up` and go straight to attach — this
+        // makes startInstance idempotent and avoids exit-code-1 failures on
+        // server restart when containers were left running from a previous
+        // session.
+        const preExistingContainers = await getDockerComposeContainers(instanceConfig.id);
+        const alreadyRunning = preExistingContainers.some(c => c.state === 'running');
+
+        if (!alreadyRunning) {
+            // Stream `docker compose up` output so the user can see what happened.
+            // --progress=plain suppresses the interactive spinner/cursor-movement
+            // output that would produce garbled text when replayed in xterm.js.
+            try {
+                await spawnDockerCompose(['--progress', 'plain', 'up', '-d'], instanceCwd,
+                    (chunk) => { composeStartupOutput += chunk; });
+            } catch (e) {
+                if (composeStartupOutput) {
+                    console.error('docker compose up output:\n', composeStartupOutput);
+                }
+                console.error('Docker compose up failed', e);
+                throw new Error(i18n.t('server.docker_compose_up_failed', { error: e.message }));
+            }
+            // Clean up interactive progress output so it renders correctly in xterm.js.
+            composeStartupOutput = cleanComposeOutput(composeStartupOutput);
         }
 
         const containers = await getDockerComposeContainers(instanceConfig.id);
         if (containers.length === 0) {
-             throw new Error('No containers found for this docker compose project');
+            throw new Error('No containers found for this docker compose project');
         }
-        
+
         const containerInfo = containers[0];
         const container = docker.getContainer(containerInfo.id);
         const inspectData = await container.inspect();
         const isTty = inspectData.Config.Tty;
-        
+
         const stream = await container.attach({
             stream: true,
             logs: true,
@@ -170,7 +306,7 @@ export async function startInstance(instanceConfig) {
             stdout: true,
             stderr: true,
         });
-        
+
         commandToExecute = `Docker Compose: ${containerInfo.name}`;
 
         const normalizeOutput = (data) => {
@@ -189,14 +325,11 @@ export async function startInstance(instanceConfig) {
                     } else {
                         const stdout = new PassThrough();
                         const stderr = new PassThrough();
-
                         docker.modem.demuxStream(stream, stdout, stderr);
-
                         stdout.on('data', data => handler(normalizeOutput(data)));
                         stderr.on('data', data => handler(normalizeOutput(data)));
                     }
                 }
-
                 if (event === 'exit') {
                     container.wait()
                         .then(() => handler())
@@ -209,11 +342,7 @@ export async function startInstance(instanceConfig) {
                 }
             },
             kill: (signal) => {
-               if (signal === 'SIGKILL') {
-                   execAsync('docker compose kill', { cwd: instanceCwd }).catch(console.error);
-               } else {
-                   execAsync('docker compose stop', { cwd: instanceCwd }).catch(console.error);
-               }
+                stopDockerComposeContainers(instanceConfig.id, instanceCwd, signal);
             },
             destroy: () => {
                 stream.removeAllListeners();
@@ -236,7 +365,7 @@ export async function startInstance(instanceConfig) {
 
     const session = {
         id: instanceConfig.id, pty: term, listeners: new Set(),
-        history: '',
+        history: composeStartupOutput,
         isUserTriggeredStop: false,
         isUserTriggeredRestart: false,
         restartAttempts: 0,
@@ -410,6 +539,42 @@ export async function deleteInstance(instanceId, deleteData = true) {
             }
         }
 
+        if (instanceToDelete.type === 'docker_compose') {
+            const composeCwd = instanceToDelete.cwd || path.join(WORKSPACES_PATH, instanceId);
+            try {
+                // Remove all containers (including stopped ones) that belong to this project
+                const allContainers = await docker.listContainers({
+                    all: true,
+                    filters: { label: ['com.docker.compose.project.working_dir'] }
+                });
+                const projectContainers = allContainers.filter(c =>
+                    containerBelongsToComposeInstance(instanceToDelete, { Config: { Labels: c.Labels } })
+                );
+                await Promise.all(projectContainers.map(c =>
+                    docker.getContainer(c.Id).remove({ force: true }).catch(err => {
+                        if (err.statusCode !== 404) console.error(`Failed to remove compose container ${c.Id}:`, err.message);
+                    })
+                ));
+
+                // Remove compose-created networks
+                const allNetworks = await docker.listNetworks({
+                    filters: { label: ['com.docker.compose.project.working_dir'] }
+                });
+                const projectNetworks = allNetworks.filter(n =>
+                    n.Labels?.['com.docker.compose.project.working_dir'] === composeCwd
+                );
+                await Promise.all(projectNetworks.map(n =>
+                    docker.getNetwork(n.Id).remove().catch(err => {
+                        if (err.statusCode !== 404) console.error(`Failed to remove compose network ${n.Id}:`, err.message);
+                    })
+                ));
+
+                console.log(`Cleaned up Docker Compose resources for instance ${instanceId}`);
+            } catch (err) {
+                console.error(`Failed to clean up Docker Compose resources for ${instanceId}:`, err.message);
+            }
+        }
+
         if (deleteData) {
             const cwd = instanceToDelete.cwd || path.join(WORKSPACES_PATH, instanceId);
             if (path.resolve(cwd) !== path.resolve(WORKSPACES_PATH) && isPathWithinRoot(WORKSPACES_PATH, cwd)) {
@@ -444,6 +609,18 @@ export async function initializeInstancesState() {
                 if (error.statusCode !== 404) {
                     console.error(i18n.t('server.error_initializing_instance_check', { name: instance.name, error: error.message }));
                 }
+            }
+        }
+
+        if (instance.type === 'docker_compose' && !activeInstances.has(instance.id)) {
+            try {
+                const containers = await getDockerComposeContainers(instance.id);
+                if (containers.some(c => c.state === 'running')) {
+                    console.log(`Detected running Docker Compose project: ${instance.name}, re-attaching...`);
+                    await startInstance(instance);
+                }
+            } catch (error) {
+                console.error(`Error re-attaching docker_compose instance ${instance.name}:`, error.message);
             }
         }
     }
@@ -487,9 +664,12 @@ export async function getDockerComposeContainers(instanceId) {
 export async function switchDockerComposeContainer(instanceId, containerName) {
     const session = activeInstances.get(instanceId);
     if (!session) throw new Error('Instance not running');
-    
+
     const instanceConfig = getInstanceById(instanceId);
     if (!instanceConfig || instanceConfig.type !== 'docker_compose') throw new Error('Not a docker compose instance');
+
+    // Resolved cwd — same calculation as startInstance
+    const instanceCwd = instanceConfig.cwd || path.join(WORKSPACES_PATH, instanceConfig.id);
 
     try {
         if (typeof containerName !== 'string' || !containerName) throw new Error('Invalid container name');
@@ -498,23 +678,12 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
         if (!containerBelongsToComposeInstance(instanceConfig, inspectData)) {
             throw new Error('Container does not belong to this Compose instance');
         }
-        
-        // 1. "Detach" current term.
-        // We can't easily "detach" the listeners added in `startInstance` without keeping references.
-        // But `session.listeners` are WebSocket clients.
-        // The `term.on('data')` pushes to history and clients.
-        // We need to stop the *old* `stream.on('data')`.
-        
-        // Issue: The `term` object defined in `startInstance` doesn't expose the stream to remove listeners.
-        // Hack: We can just replace the `term` object in `session` and somehow tell the old one to shut up.
-        // But the old stream is still flowing.
-        // We should add a `destroy` method to the `term` object we create.
-        
+
+        // Detach and destroy the old stream before attaching to the new one
         if (session.pty.destroy) {
             session.pty.destroy();
         }
-        
-        // 2. Attach new
+
         const isTty = inspectData.Config.Tty;
 
         const stream = await container.attach({
@@ -525,45 +694,36 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
             stderr: true,
         });
 
-        // Update history? Maybe print a message.
         const switchMsg = `\r\n\x1b[33m--- Switched to container: ${containerName} ---\x1b[0m\r\n`;
         session.history = appendTerminalHistory(session.history, switchMsg);
-         session.listeners.forEach(ws => {
+        session.listeners.forEach(ws => {
             if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceId, data: switchMsg }));
         });
+
+        const normalizeOutput = (data) => {
+            let str = data.toString('utf8');
+            str = str.replace(/\r(?!\n)/g, '\r\n');
+            return Buffer.from(str, 'utf8');
+        };
 
         const term = {
             pid: container.id,
             write: (data) => stream.write(data),
             on: (event, handler) => {
                 if (event === 'data') {
-                     if (isTty) {
+                    if (isTty) {
                         stream.on('data', handler);
                     } else {
-                        // Demux Docker stream
-                        stream.on('data', (chunk) => {
-                            let offset = 0;
-                            while (offset < chunk.length) {
-                                if (chunk.length < offset + 8) break;
-                                const type = chunk.readUInt8(offset);
-                                const length = chunk.readUInt32BE(offset + 4);
-                                offset += 8;
-                                if (offset + length <= chunk.length) {
-                                    handler(chunk.slice(offset, offset + length));
-                                    offset += length;
-                                } else {
-                                    break;
-                                }
-                            }
-                        });
+                        // Use docker.modem.demuxStream to correctly handle TCP-fragmented chunks
+                        const stdout = new PassThrough();
+                        const stderr = new PassThrough();
+                        docker.modem.demuxStream(stream, stdout, stderr);
+                        stdout.on('data', data => handler(normalizeOutput(data)));
+                        stderr.on('data', data => handler(normalizeOutput(data)));
                     }
                 }
-                // We DON'T listen to exit here for restarting the instance, 
-                // because switching containers shouldn't control instance lifecycle (unless it's the main one?)
-                // Let's leave exit handler empty or minimal for switched containers.
-                // Or maybe we should? If this container dies, what happens?
-                // Ideally, the "Instance" is the Compose Project. It stops when `docker compose down` or all containers stop.
-                // For now, let's just handle data.
+                // The compose project lifecycle is managed at the instance level;
+                // individual container exits are not used to drive restarts here.
             },
             resize: (cols, rows) => {
                 if (cols > 0 && rows > 0) {
@@ -571,23 +731,15 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
                 }
             },
             kill: (signal) => {
-                 // Forward kill to the compose project, not just this container?
-                 // Or just do nothing because `stopInstance` handles the compose down?
-                 // `stopInstance` calls `pty.kill`.
-                 // For Docker Compose, `pty.kill` should stop the *project*.
-                  if (signal === 'SIGKILL') {
-                       execAsync('docker compose kill', { cwd: instanceConfig.cwd }).catch(console.error);
-                   } else {
-                       execAsync('docker compose stop', { cwd: instanceConfig.cwd }).catch(console.error);
-                   }
+                stopDockerComposeContainers(instanceId, instanceCwd, signal);
             },
             destroy: () => {
                 stream.removeAllListeners();
                 stream.destroy();
             }
         };
-        
-        // Re-bind data listener
+
+        // Re-bind data listener on the new term
         term.on('data', (data) => {
             const output = data.toString('utf8');
             session.history = appendTerminalHistory(session.history, output);
@@ -597,7 +749,7 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
         });
 
         session.pty = term;
-        
+
     } catch (error) {
         console.error('Failed to switch container:', error);
         throw error;
