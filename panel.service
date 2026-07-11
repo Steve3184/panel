@@ -2,11 +2,16 @@
 Description=Panel
 
 [Service]
+User=panel
+Group=panel
+UMask=0077
 Restart=on-failure
 RestartSec=5s
 WorkingDirectory=/opt/panel
 ExecStart=/usr/bin/node src/server.js
 ExecStop=/bin/kill -s TERM $MAINPID
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

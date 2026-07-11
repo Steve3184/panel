@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, reactive } from 'vue';
 import { useI18n } from '../composables/useI18n';
 import api from '../services/api'; // Import api service
+import { Modal } from 'bootstrap';
 
 export const useUiStore = defineStore('ui', () => {
     const { t } = useI18n();
@@ -10,6 +11,7 @@ export const useUiStore = defineStore('ui', () => {
     const panelLogo = ref('');
     const panelBackground = ref(''); // New state for panel background
     const panelSettings = ref(null); // New state for panel settings
+    const capabilities = ref({ platform: null, shellSandbox: { supported: false, reason: 'not-checked' } });
     const themeMode = ref('auto'); // 'light', 'dark', or 'auto'
     
     // Modal visibility state
@@ -60,9 +62,6 @@ export const useUiStore = defineStore('ui', () => {
     function openModal(modalName) {
         if (modalName in modals) {
             modals[modalName] = true;
-            if (modalName === 'panelSettings') {
-                _fetchPanelSettings(); // Call the internal function
-            }
         }
     }
 
@@ -71,14 +70,30 @@ export const useUiStore = defineStore('ui', () => {
             const settings = await api.getPanelSettings();
             panelSettings.value = settings;
             panelLogo.value = settings.panelLogo;
-            panelBackground.value = settings.panelBackground || ''; // 确保 panelBackground 始终存在
         } catch (error) {
             console.error(error);
         }
     }
 
+    async function fetchPublicPanelSettings() {
+        try {
+            const settings = await api.getPublicPanelSettings();
+            panelLogo.value = settings.panelLogo || '';
+            return settings;
+        } catch (error) {
+            console.error(error);
+            return null;
+        }
+    }
+
     function closeModal(modalName) {
         if (modalName in modals) {
+            const modalElement = document.querySelector(`[data-modal-name="${modalName}"]`);
+            const modalInstance = modalElement ? Modal.getInstance(modalElement) : null;
+            if (modalElement?.classList.contains('show') && modalInstance) {
+                modalInstance.hide();
+                return;
+            }
             modals[modalName] = false;
         }
     }
@@ -184,6 +199,7 @@ export const useUiStore = defineStore('ui', () => {
         panelLogo,
         themeMode,
         panelSettings,
+        capabilities,
         panelBackground,
         updatePanelLogo,
         updatePanelBackground,
@@ -196,6 +212,7 @@ export const useUiStore = defineStore('ui', () => {
         updateProgressToast,
         updateStatusToast,
         fetchPanelSettings: _fetchPanelSettings,
+        fetchPublicPanelSettings,
         setThemeMode
     };
 });

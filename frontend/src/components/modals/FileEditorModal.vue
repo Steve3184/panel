@@ -1,5 +1,5 @@
 <template>
-  <div class="modal fade" tabindex="-1" ref="modalEle">
+  <div class="modal fade" data-modal-name="fileEditor" tabindex="-1" ref="modalEle">
     <div class="modal-dialog modal-fullscreen">
       <div class="modal-content bg-dark text-light border-0">
         <div class="modal-header border-secondary">

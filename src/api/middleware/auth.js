@@ -7,13 +7,20 @@ import { USERS_DB_PATH } from '../../config.js';
  */
 export const firstRunCheck = (req, res, next) => {
     const users = readDb(USERS_DB_PATH, []);
+    const publicFirstRunPaths = new Set([
+        '/api/setup',
+        '/api/login',
+        '/api/users/check',
+        '/api/capabilities',
+        '/api/panel-settings/public',
+        '/api/panel-settings/background',
+        '/setup'
+    ]);
     // 如果没有用户，并且请求的不是 setup 或 login 页面/API，则重定向到 setup 页面
     if (users.length === 0 &&
-        req.path !== '/api/setup' &&
-        req.path !== '/api/login' &&
+        !publicFirstRunPaths.has(req.path) &&
         !req.path.startsWith('/assets') &&
-        !req.path.startsWith('/lang') &&
-        req.path !== '/setup' // 允许访问设置页面
+        !req.path.startsWith('/lang')
     ) {
         return res.redirect('/setup');
     }
@@ -25,17 +32,21 @@ export const firstRunCheck = (req, res, next) => {
  * 检查用户是否已登录。
  */
 export const isAuthenticated = (req, res, next) => {
-    const publicPaths = ['/', '/api/login', '/api/setup', '/api/users/check', '/setup', '/login'];
-    // 允许访问静态资源和公共API
-    if (publicPaths.includes(req.path)) {
-        return next();
-    }
     if (!req.session.user) {
-        if (req.xhr || req.headers.accept.indexOf('json') > -1) {
-            return res.status(401).json({ message: 'server.unauthorized' });
-        }
-        return res.redirect('/login');
+        return res.status(401).json({ message: 'server.unauthorized' });
     }
+    const users = readDb(USERS_DB_PATH, []);
+    const currentUser = users.find(user => user.id === req.session.user.id);
+    if (!currentUser || (currentUser.sessionVersion || 0) !== (req.session.user.sessionVersion || 0)) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ message: 'server.unauthorized' });
+    }
+    req.session.user = {
+        id: currentUser.id,
+        username: currentUser.username,
+        role: currentUser.role,
+        sessionVersion: currentUser.sessionVersion || 0
+    };
     req.user = req.session.user;
     next();
 };

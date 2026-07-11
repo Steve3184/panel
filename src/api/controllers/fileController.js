@@ -2,21 +2,272 @@ import fs from 'fs-extra';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import Busboy from 'busboy';
-import decompress from 'decompress';
 import sevenBin from '7zip-bin';
 import SevenZip from 'node-7z';
-import archiver from 'archiver';
-import decompressTar from '@xhmikosr/decompress-tar';
-import decompressTarGz from '@xhmikosr/decompress-targz';
-import decompressTarBz2 from '@xhmikosr/decompress-tarbz2';
-import decompressTarXz from '@felipecrs/decompress-tarxz';
+import { TarArchive } from 'archiver';
+import * as tar from 'tar';
+import yauzl from 'yauzl';
+import { spawn } from 'child_process';
+import { once } from 'events';
+import { pipeline } from 'stream/promises';
 
-import { getFileAbsolutePath, activeUploads } from '../../core/fileManager.js';
+import { getFileAbsolutePath, getInstanceRootPath, isPathWithinRoot, activeUploads } from '../../core/fileManager.js';
 import { UPLOAD_TEMP_DIR } from '../../config.js';
-import { broadcast } from '../../websocket/handler.js';
+import { broadcastToInstance } from '../../websocket/handler.js';
 import i18n from '../../utils/i18n.js';
 
 const pathTo7zip = sevenBin.path7za;
+const MAX_ARCHIVE_ENTRIES = 10_000;
+const MAX_EXTRACTED_SIZE = 4 * 1024 * 1024 * 1024;
+const MAX_ACTIVE_UPLOADS_PER_USER = 4;
+const UPLOAD_TTL_MS = 30 * 60 * 1000;
+
+async function cleanupUpload(uploadId) {
+    const upload = activeUploads.get(uploadId);
+    if (!upload) return;
+    activeUploads.delete(uploadId);
+    if (upload.timeout) clearTimeout(upload.timeout);
+    if (upload.writeStream && !upload.writeStream.destroyed) upload.writeStream.destroy();
+    await fs.remove(upload.tempFilePath).catch(() => {});
+}
+
+function scheduleUploadExpiry(uploadId, upload) {
+    if (upload.timeout) clearTimeout(upload.timeout);
+    upload.timeout = setTimeout(() => {
+        cleanupUpload(uploadId).catch(() => {});
+    }, UPLOAD_TTL_MS);
+    upload.timeout.unref?.();
+}
+
+function assertSafeArchiveEntry(entryPath) {
+    const normalized = entryPath.replace(/\\/g, '/');
+    const segments = normalized.split('/');
+    if (!normalized || normalized.includes('\0') || normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized) || segments.includes('..')) {
+        throw new Error('Access denied: Archive contains an unsafe path.');
+    }
+}
+
+async function canExecute(binary) {
+    return new Promise(resolve => {
+        const child = spawn(binary, [], { stdio: 'ignore' });
+        child.once('error', () => resolve(false));
+        child.once('close', () => resolve(true));
+    });
+}
+
+let resolvedSevenZipBinary;
+async function getSevenZipBinary() {
+    if (resolvedSevenZipBinary) return resolvedSevenZipBinary;
+    const candidates = [process.env.SEVEN_ZIP_BIN, '7zz', '7z', '7za', pathTo7zip].filter(Boolean);
+    for (const candidate of candidates) {
+        if (await canExecute(candidate)) {
+            resolvedSevenZipBinary = candidate;
+            return candidate;
+        }
+    }
+    throw new Error('7-Zip executable not found.');
+}
+
+async function extract7zSafely(archivePath, stagingPath, onProgress) {
+    const binary = await getSevenZipBinary();
+    let entryCount = 0;
+    let totalSize = 0;
+
+    await new Promise((resolve, reject) => {
+        const listStream = SevenZip.list(archivePath, { techInfo: true, $bin: binary });
+        listStream.on('data', entry => {
+            try {
+                entryCount += 1;
+                const techInfo = entry.techInfo || new Map();
+                const entryPath = entry.file || techInfo.get('Path');
+                const attributes = String(entry.attributes || techInfo.get('Attributes') || '');
+                const linkTarget = techInfo.get('Symbolic Link') || techInfo.get('Hard Link');
+                assertSafeArchiveEntry(entryPath);
+                totalSize += Number(entry.size ?? techInfo.get('Size')) || 0;
+                if (entryCount > MAX_ARCHIVE_ENTRIES || totalSize > MAX_EXTRACTED_SIZE) {
+                    throw new Error('Archive exceeds extraction limits.');
+                }
+                if (linkTarget || /(?:^|\s)l[rwx-]{9}(?:\s|$)/i.test(attributes) || /reparse/i.test(attributes)) {
+                    throw new Error('Access denied: Archive contains a link.');
+                }
+            } catch (error) {
+                listStream.destroy();
+                reject(error);
+            }
+        });
+        listStream.once('error', reject);
+        listStream.once('end', resolve);
+    });
+
+    await new Promise((resolve, reject) => {
+        const extractStream = SevenZip.extractFull(archivePath, stagingPath, {
+            $progress: true,
+            $bin: binary,
+            recursive: true
+        });
+        extractStream.on('progress', progress => onProgress(Math.min(99, progress.percent || 0)));
+        extractStream.once('error', reject);
+        extractStream.once('end', resolve);
+    });
+}
+
+async function extractZipSafely(archivePath, stagingPath, onProgress) {
+    await new Promise((resolve, reject) => {
+        yauzl.open(archivePath, { lazyEntries: true, strictFileNames: true, validateEntrySizes: true }, (openError, zipFile) => {
+            if (openError) return reject(openError);
+            let entryCount = 0;
+            let totalSize = 0;
+
+            const fail = (error) => {
+                zipFile.close();
+                reject(error);
+            };
+
+            zipFile.on('error', fail);
+            zipFile.on('end', resolve);
+            zipFile.on('entry', async (entry) => {
+                try {
+                    entryCount += 1;
+                    totalSize += entry.uncompressedSize;
+                    if (entryCount > MAX_ARCHIVE_ENTRIES || totalSize > MAX_EXTRACTED_SIZE) {
+                        throw new Error('Archive exceeds extraction limits.');
+                    }
+
+                    assertSafeArchiveEntry(entry.fileName);
+                    if ((entry.generalPurposeBitFlag & 0x1) !== 0) {
+                        throw new Error('Encrypted archives are not supported.');
+                    }
+
+                    const unixMode = (entry.externalFileAttributes >>> 16) & 0xffff;
+                    if ((unixMode & 0o170000) === 0o120000) {
+                        throw new Error('Access denied: Archive contains a symbolic link.');
+                    }
+
+                    const outputPath = path.resolve(stagingPath, entry.fileName);
+                    if (!isPathWithinRoot(stagingPath, outputPath)) {
+                        throw new Error('Access denied: Archive path escapes extraction directory.');
+                    }
+
+                    if (entry.fileName.endsWith('/')) {
+                        await fs.ensureDir(outputPath);
+                    } else {
+                        await fs.ensureDir(path.dirname(outputPath));
+                        const readStream = await new Promise((streamResolve, streamReject) => {
+                            zipFile.openReadStream(entry, (error, stream) => error ? streamReject(error) : streamResolve(stream));
+                        });
+                        await pipeline(readStream, fs.createWriteStream(outputPath, { flags: 'wx', mode: 0o600 }));
+                    }
+
+                    onProgress(Math.min(99, Math.round((entryCount / Math.max(zipFile.entryCount, 1)) * 100)));
+                    zipFile.readEntry();
+                } catch (error) {
+                    fail(error);
+                }
+            });
+            zipFile.readEntry();
+        });
+    });
+}
+
+function createTarOptions(stagingPath, onProgress) {
+    let entryCount = 0;
+    let totalSize = 0;
+    let validationError = null;
+    return {
+        options: {
+            cwd: stagingPath,
+            strict: true,
+            preservePaths: false,
+            noChmod: true,
+            filter: (entryPath, entry) => {
+                try {
+                    assertSafeArchiveEntry(entryPath);
+                    entryCount += 1;
+                    totalSize += Number(entry.size) || 0;
+                    if (entryCount > MAX_ARCHIVE_ENTRIES || totalSize > MAX_EXTRACTED_SIZE) {
+                        throw new Error('Archive exceeds extraction limits.');
+                    }
+                    if (!['File', 'OldFile', 'ContiguousFile', 'Directory'].includes(entry.type)) {
+                        throw new Error(`Access denied: Unsupported archive entry type ${entry.type}.`);
+                    }
+                    onProgress(Math.min(99, Math.max(1, Math.round(entryCount / MAX_ARCHIVE_ENTRIES * 100))));
+                    return true;
+                } catch (error) {
+                    validationError ||= error;
+                    return false;
+                }
+            }
+        },
+        getValidationError: () => validationError
+    };
+}
+
+async function extractTarSafely(archivePath, stagingPath, isXz, onProgress) {
+    const validation = createTarOptions(stagingPath, onProgress);
+    if (!isXz) {
+        await tar.extract({ ...validation.options, file: archivePath });
+        if (validation.getValidationError()) throw validation.getValidationError();
+        return;
+    }
+
+    const xzProcess = spawn('xz', ['-dc', '--', archivePath], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    xzProcess.stderr.on('data', chunk => { stderr += chunk.toString(); });
+    await pipeline(xzProcess.stdout, tar.extract(validation.options));
+    const [exitCode] = await once(xzProcess, 'close');
+    if (exitCode !== 0) throw new Error(`xz extraction failed: ${stderr.trim()}`);
+    if (validation.getValidationError()) throw validation.getValidationError();
+}
+
+async function validateExtractedTree(rootPath, state = { entries: 0, size: 0 }) {
+    const entries = await fs.readdir(rootPath, { withFileTypes: true });
+    for (const entry of entries) {
+        const entryPath = path.join(rootPath, entry.name);
+        const stats = await fs.lstat(entryPath);
+        state.entries += 1;
+        state.size += stats.isFile() ? stats.size : 0;
+        if (state.entries > MAX_ARCHIVE_ENTRIES || state.size > MAX_EXTRACTED_SIZE) {
+            throw new Error('Archive exceeds extraction limits.');
+        }
+        if (stats.isSymbolicLink() || (!stats.isFile() && !stats.isDirectory())) {
+            throw new Error('Access denied: Archive produced an unsafe file type.');
+        }
+        if (stats.isDirectory()) await validateExtractedTree(entryPath, state);
+    }
+}
+
+async function assertSafeSourceTree(sourcePath) {
+    const stats = await fs.lstat(sourcePath);
+    if (stats.isSymbolicLink()) {
+        throw new Error('Access denied: Symbolic links cannot be copied or archived.');
+    }
+    if (!stats.isDirectory()) return;
+    const entries = await fs.readdir(sourcePath);
+    for (const entry of entries) {
+        await assertSafeSourceTree(path.join(sourcePath, entry));
+    }
+}
+
+async function copyExtractedTree(instanceId, sourceRoot, destinationRelativePath) {
+    const walk = async (currentSource, currentRelative = '') => {
+        const entries = await fs.readdir(currentSource, { withFileTypes: true });
+        for (const entry of entries) {
+            const sourcePath = path.join(currentSource, entry.name);
+            const relativePath = path.join(currentRelative, entry.name);
+            const targetRelativePath = path.join(destinationRelativePath, relativePath);
+            const targetPath = await getFileAbsolutePath(instanceId, targetRelativePath, { allowMissing: true });
+            if (entry.isDirectory()) {
+                await fs.ensureDir(targetPath, 0o700);
+                await walk(sourcePath, relativePath);
+            } else {
+                await fs.ensureDir(path.dirname(targetPath), 0o700);
+                await fs.copyFile(sourcePath, targetPath);
+                await fs.chmod(targetPath, 0o600);
+            }
+        }
+    };
+    await walk(sourceRoot);
+}
 
 // --- 辅助函数 ---
 const handleFileError = (res, error, defaultMessage) => {
@@ -38,7 +289,7 @@ export const listFiles = async (req, res) => {
     try {
         const { instanceId } = req.params;
         const relativePath = req.params[0] || '';
-        const absolutePath = getFileAbsolutePath(instanceId, relativePath);
+        const absolutePath = await getFileAbsolutePath(instanceId, relativePath);
 
         const stats = await fs.stat(absolutePath);
         if (!stats.isDirectory()) {
@@ -49,7 +300,8 @@ export const listFiles = async (req, res) => {
         const fileDetails = await Promise.all(files.map(async file => {
             try {
                 const filePath = path.join(absolutePath, file);
-                const fileStats = await fs.stat(filePath);
+                const fileStats = await fs.lstat(filePath);
+                if (fileStats.isSymbolicLink()) return null;
                 return {
                     name: file,
                     path: path.join(relativePath, file),
@@ -69,7 +321,7 @@ export const getFileContent = async (req, res) => {
     try {
         const { instanceId } = req.params;
         const relativePath = req.params[0] || '';
-        const absolutePath = getFileAbsolutePath(instanceId, relativePath);
+        const absolutePath = await getFileAbsolutePath(instanceId, relativePath);
 
         const stats = await fs.stat(absolutePath);
         if (!stats.isFile()) return res.status(400).json({ message: 'server.path_not_file' });
@@ -86,7 +338,7 @@ export const downloadFile = async (req, res) => {
     try {
         const { instanceId } = req.params;
         const relativePath = req.params[0] || '';
-        const absolutePath = getFileAbsolutePath(instanceId, relativePath);
+        const absolutePath = await getFileAbsolutePath(instanceId, relativePath);
         const stats = await fs.stat(absolutePath);
         if (!stats.isFile()) return res.status(400).json({ message: 'server.path_not_file' });
 
@@ -104,7 +356,7 @@ export const createDirectory = async (req, res) => {
         if (!name) return res.status(400).json({ message: 'server.directory_name_required' });
 
         const newDirPath = path.join(relativePath, name);
-        const absolutePath = getFileAbsolutePath(instanceId, newDirPath);
+        const absolutePath = await getFileAbsolutePath(instanceId, newDirPath, { allowMissing: true });
 
         await fs.ensureDir(absolutePath);
         res.status(201).json({ message: 'server.ok', path: newDirPath });
@@ -121,7 +373,7 @@ export const createFile = async (req, res) => {
         if (!name) return res.status(400).json({ message: 'server.file_name_required' });
 
         const newFilePath = path.join(relativePath, name);
-        const absolutePath = getFileAbsolutePath(instanceId, newFilePath);
+        const absolutePath = await getFileAbsolutePath(instanceId, newFilePath, { allowMissing: true });
 
         await fs.ensureDir(path.dirname(absolutePath));
         await fs.writeFile(absolutePath, content || '');
@@ -137,8 +389,8 @@ export const deletePath = async (req, res) => {
         const relativePath = req.params[0] || '';
         if (!relativePath) return res.status(400).json({ message: 'Path is required.' });
 
-        const absolutePath = getFileAbsolutePath(instanceId, relativePath);
-        const instanceCwd = req.instanceConfig.cwd || path.join(WORKSPACES_PATH, instanceId);
+        const absolutePath = await getFileAbsolutePath(instanceId, relativePath);
+        const instanceCwd = await fs.realpath(getInstanceRootPath(instanceId));
         if (absolutePath === instanceCwd) {
             return res.status(403).json({ message: 'Cannot delete instance root.' });
         }
@@ -156,14 +408,12 @@ export const renamePath = async (req, res) => {
         const { oldPath, newName } = req.body;
         if (!oldPath || !newName) return res.status(400).json({ message: 'Old path and new name are required.' });
 
-        const oldAbsolutePath = getFileAbsolutePath(instanceId, oldPath);
-        const newAbsolutePath = path.join(path.dirname(oldAbsolutePath), newName);
-
-        // 额外的安全检查
-        const instanceCwd = req.instanceConfig.cwd || path.join(WORKSPACES_PATH, instanceId);
-        if (!newAbsolutePath.startsWith(instanceCwd)) {
-            return res.status(403).json({ message: 'server.access_denied_outside' });
+        if (path.basename(newName) !== newName || newName === '.' || newName === '..') {
+            return res.status(400).json({ message: 'server.invalid_action' });
         }
+        const oldAbsolutePath = await getFileAbsolutePath(instanceId, oldPath);
+        const newRelativePath = path.join(path.dirname(oldPath), newName);
+        const newAbsolutePath = await getFileAbsolutePath(instanceId, newRelativePath, { allowMissing: true });
 
         await fs.move(oldAbsolutePath, newAbsolutePath);
         res.json({ message: 'server.ok' });
@@ -180,27 +430,39 @@ export const initUpload = async (req, res) => {
         if (!fileName || typeof fileSize !== 'number' || fileSize <= 0) {
             return res.status(400).json({ message: 'server.invalid_file_details' });
         }
-        // 4GB 限制
+        // 16GB limit per file; concurrent upload count and expiry are enforced separately.
         const MAX_FILE_SIZE = 16 * 1024 * 1024 * 1024;
         if (fileSize > MAX_FILE_SIZE) {
             return res.status(413).json({ message: 'server.file_size_exceeds_limit' });
         }
+        const activeUploadCount = [...activeUploads.values()].filter(upload => upload.userId === req.session.user.id).length;
+        if (activeUploadCount >= MAX_ACTIVE_UPLOADS_PER_USER) {
+            return res.status(429).json({ message: 'server.too_many_uploads' });
+        }
 
         const uploadId = uuidv4();
         const tempFilePath = path.join(UPLOAD_TEMP_DIR, uploadId);
-        const targetPath = getFileAbsolutePath(instanceId, path.join(targetDirectory || '.', fileName));
+        if (path.basename(fileName) !== fileName) {
+            return res.status(400).json({ message: 'server.invalid_file_details' });
+        }
+        const targetPath = await getFileAbsolutePath(instanceId, path.join(targetDirectory || '.', fileName), { allowMissing: true });
 
         fs.ensureDirSync(path.dirname(targetPath));
 
-        activeUploads.set(uploadId, {
+        const upload = {
             instanceId,
+            userId: req.session.user.id,
             fileName,
             fileSize,
             tempFilePath,
             targetPath,
             receivedSize: 0,
-            writeStream: fs.createWriteStream(tempFilePath, { flags: 'w' }),
-        });
+            writeStream: null,
+            busy: false,
+            timeout: null
+        };
+        activeUploads.set(uploadId, upload);
+        scheduleUploadExpiry(uploadId, upload);
 
         res.status(200).json({ uploadId, message: 'server.upload_initiated' });
     } catch (error) {
@@ -212,30 +474,63 @@ export const initUpload = async (req, res) => {
  * 使用 busboy 处理文件分块上传。
  */
 export const uploadChunk = (req, res) => {
-    const busboy = Busboy({ headers: req.headers });
-    let uploadId, chunkIndex;
+    const busboy = Busboy({ headers: req.headers, limits: { files: 1, fields: 2, fileSize: 16 * 1024 * 1024 } });
+    let uploadId;
+    let responseSent = false;
+
+    const respond = (status, body) => {
+        if (responseSent || res.headersSent) return;
+        responseSent = true;
+        res.status(status).json(body);
+    };
 
     busboy.on('field', (fieldname, val) => {
         if (fieldname === 'uploadId') uploadId = val;
-        if (fieldname === 'chunkIndex') chunkIndex = parseInt(val, 10);
     });
 
     busboy.on('file', (fieldname, file) => {
+        const upload = activeUploads.get(uploadId);
+        if (!upload || upload.instanceId !== req.params.instanceId || upload.userId !== req.session.user.id) {
+            file.resume();
+            respond(404, { message: 'server.upload_not_found_or_expired' });
+            return;
+        }
+        if (upload.busy) {
+            file.resume();
+            respond(409, { message: 'server.upload_chunk_in_progress' });
+            return;
+        }
+        upload.busy = true;
+        scheduleUploadExpiry(uploadId, upload);
+        if (!upload.writeStream) {
+            upload.writeStream = fs.createWriteStream(upload.tempFilePath, { flags: 'wx', mode: 0o600 });
+            upload.writeStream.on('error', () => cleanupUpload(uploadId).catch(() => {}));
+        }
+
         file.on('data', (data) => {
-            const upload = activeUploads.get(uploadId);
-            if (upload && upload.writeStream) {
-                upload.writeStream.write(data);
+            if (upload.writeStream && upload.receivedSize + data.length <= upload.fileSize) {
                 upload.receivedSize += data.length;
+                if (!upload.writeStream.write(data)) {
+                    file.pause();
+                    upload.writeStream.once('drain', () => file.resume());
+                }
+            } else {
+                file.destroy(new Error('Upload exceeds declared file size.'));
             }
         });
         file.on('end', () => {
-            const upload = activeUploads.get(uploadId);
-            res.status(200).json({ message: 'server.ok', receivedSize: upload?.receivedSize || 0 });
+            upload.busy = false;
+            respond(200, { message: 'server.ok', receivedSize: upload.receivedSize });
+        });
+        file.on('error', () => cleanupUpload(uploadId).catch(() => {}));
+        file.on('limit', () => {
+            cleanupUpload(uploadId).catch(() => {});
+            respond(413, { message: 'server.file_size_exceeds_limit' });
         });
     });
 
     busboy.on('error', (err) => {
-        res.status(500).json({ message: 'server.file_upload_chunk_failed_parsing', error: err.message });
+        respond(400, { message: 'server.file_upload_chunk_failed_parsing', error: err.message });
     });
 
     req.pipe(busboy);
@@ -249,17 +544,20 @@ export const completeUpload = async (req, res) => {
         const { uploadId } = req.body;
         const upload = activeUploads.get(uploadId);
 
-        if (!upload) {
+        if (!upload || upload.instanceId !== req.params.instanceId || upload.userId !== req.session.user.id) {
             return res.status(404).json({ message: 'server.upload_not_found_or_expired' });
         }
+        if (upload.busy) return res.status(409).json({ message: 'server.upload_chunk_in_progress' });
 
         // 关闭写文件流
-        upload.writeStream.end();
+        if (upload.writeStream) {
+            upload.writeStream.end();
+            await once(upload.writeStream, 'finish');
+        }
 
         // 验证文件大小是否匹配
         if (upload.receivedSize !== upload.fileSize) {
-            await fs.remove(upload.tempFilePath); // 清理不完整的文件
-            activeUploads.delete(uploadId);
+            await cleanupUpload(uploadId);
             return res.status(400).json({ message: 'server.not_all_chunks_received' });
         }
 
@@ -267,9 +565,10 @@ export const completeUpload = async (req, res) => {
         await fs.move(upload.tempFilePath, upload.targetPath, { overwrite: true });
 
         // 清理
+        if (upload.timeout) clearTimeout(upload.timeout);
         activeUploads.delete(uploadId);
 
-        const relativeFilePath = path.relative(req.instanceConfig.cwd, upload.targetPath);
+        const relativeFilePath = path.relative(await fs.realpath(getInstanceRootPath(req.params.instanceId)), upload.targetPath);
         res.status(200).json({ message: 'server.file_uploaded_successfully', filePath: relativeFilePath });
 
     } catch (error) {
@@ -288,8 +587,9 @@ export const extractArchive = async (req, res) => {
     if (!filePath) return res.status(400).json({ message: 'server.file_path_required' });
 
     try {
-        const absoluteFilePath = getFileAbsolutePath(instanceId, filePath);
-        const absoluteDestinationPath = getFileAbsolutePath(instanceId, destinationPath || path.dirname(filePath));
+        const destinationRelativePath = destinationPath || path.dirname(filePath);
+        const absoluteFilePath = await getFileAbsolutePath(instanceId, filePath);
+        const absoluteDestinationPath = await getFileAbsolutePath(instanceId, destinationRelativePath, { allowMissing: true });
         await fs.ensureDir(absoluteDestinationPath);
 
         const extractId = uuidv4();
@@ -300,90 +600,54 @@ export const extractArchive = async (req, res) => {
         // --- 后台处理逻辑 ---
         (async () => {
             const sendProgress = (progress) => {
-                broadcast({
+                broadcastToInstance(instanceId, {
                     type: 'file-extract-progress',
                     extractId: extractId,
                     fileName: baseName,
                     status: 'in-progress',
                     progress: progress // 0-100
-                });
+                }, null, true);
             };
 
             const sendCompletion = (status, message) => {
-                broadcast({
+                broadcastToInstance(instanceId, {
                     type: 'file-extract-status',
                     extractId: extractId,
                     fileName: baseName,
                     status: status,
                     message: message
-                });
+                }, null, true);
                 if (status === 'success') {
-                    broadcast({
+                    broadcastToInstance(instanceId, {
                         type: 'file-change',
                         instanceId: instanceId,
                         path: destinationPath || path.dirname(filePath),
-                    });
+                    }, null, true);
                 }
             };
 
+            const stagingPath = path.join(UPLOAD_TEMP_DIR, `extract-${extractId}`);
             try {
-                if (fileExtension === '.7z' || fileExtension === '.zip') {
-                    const sevenZStream = SevenZip.extractFull(absoluteFilePath, absoluteDestinationPath, {
-                        $progress: true,
-                        $bin: pathTo7zip
-                    });
-
-                    let lastProgress = -1;
-                    sevenZStream.on('progress', (progress) => {
-                        if (lastProgress < progress.percent) {
-                            sendProgress(progress.percent);
-                            lastProgress = progress.percent;
-                        }
-                    });
-
-                    sevenZStream.on('end', () => {
-                        console.log(i18n.t('server.file_extracted_success_log', { filePath: filePath, absoluteDestinationPath: absoluteDestinationPath }));
-                        sendCompletion('success', 'server.file_extracted_success');
-                    });
-
-                    sevenZStream.on('error', (err) => {
-                        console.error(i18n.t('server.file_extract_failed_log', { filePath: filePath }), err);
-                        sendCompletion('error', 'server.file_extract_failed');
-                    });
-
-                } else if (filePath.toLowerCase().endsWith('.tar.gz') || filePath.toLowerCase().endsWith('.tgz') || filePath.toLowerCase().endsWith('.tar.xz') || filePath.toLowerCase().endsWith('.tar')) {
-                    // decompress 库支持多种 tar 格式
-                    // decompress 库本身不直接提供进度事件，需要通过文件数量来模拟
-                    const files = await decompress(absoluteFilePath, absoluteDestinationPath, {
-                        plugins: [
-                            decompressTar(),
-                            decompressTarGz(),
-                            decompressTarBz2(), // 如果需要支持 .tar.bz2
-                            decompressTarXz() // 如果需要支持 .tar.xz
-                        ]
-                    });
-
-                    // 模拟进度：假设解压文件数量可以作为进度指标
-                    // 这是一个简化的进度，实际可能需要更复杂的逻辑
-                    let extractedCount = 0;
-                    const totalFiles = files.length; // decompress 返回解压的文件列表
-
-                    if (totalFiles === 0) {
-                        sendProgress(100); // 如果没有文件，直接完成
-                    } else {
-                        files.forEach((file, index) => {
-                            extractedCount++;
-                            sendProgress(Math.round((extractedCount / totalFiles) * 100));
-                        });
-                    }
-
-                    console.log(i18n.t('server.file_extracted_success_log', { filePath: filePath, absoluteDestinationPath: absoluteDestinationPath }));
-                    sendCompletion('success', 'server.file_extracted_success');
-
+                await fs.ensureDir(stagingPath, 0o700);
+                const lowerPath = filePath.toLowerCase();
+                if (fileExtension === '.zip') {
+                    await extractZipSafely(absoluteFilePath, stagingPath, sendProgress);
+                } else if (fileExtension === '.7z') {
+                    await extract7zSafely(absoluteFilePath, stagingPath, sendProgress);
+                } else if (lowerPath.endsWith('.tar.gz') || lowerPath.endsWith('.tgz') || lowerPath.endsWith('.tar')) {
+                    await extractTarSafely(absoluteFilePath, stagingPath, false, sendProgress);
+                } else if (lowerPath.endsWith('.tar.xz')) {
+                    await extractTarSafely(absoluteFilePath, stagingPath, true, sendProgress);
                 } else {
                     sendCompletion('error', 'server.unsupported_archive_type');
                     return;
                 }
+
+                await validateExtractedTree(stagingPath);
+                await copyExtractedTree(instanceId, stagingPath, destinationRelativePath);
+                sendProgress(100);
+                console.log(i18n.t('server.file_extracted_success_log', { filePath, absoluteDestinationPath }));
+                sendCompletion('success', 'server.file_extracted_success');
 
             } catch (error) {
                 if (error.message.includes('Instance not found')) {
@@ -400,6 +664,8 @@ export const extractArchive = async (req, res) => {
                 }
                 console.error('server.extract_api_internal_error_log', error);
                 sendCompletion('error', 'server.extract_api_internal_error');
+            } finally {
+                await fs.remove(stagingPath);
             }
         })();
 
@@ -419,10 +685,14 @@ export const compressFiles = async (req, res) => {
     }
 
     try {
-        const absoluteDestinationPath = getFileAbsolutePath(instanceId, destinationPath || '');
-        const absoluteOutputFilePath = path.join(absoluteDestinationPath, outputName);
+        if (path.basename(outputName) !== outputName) {
+            return res.status(400).json({ message: 'server.invalid_action' });
+        }
+        const absoluteDestinationPath = await getFileAbsolutePath(instanceId, destinationPath || '', { allowMissing: true });
+        const absoluteOutputFilePath = await getFileAbsolutePath(instanceId, path.join(destinationPath || '', outputName), { allowMissing: true });
 
-        const filesToCompressAbsolutePaths = filesToCompress.map(file => getFileAbsolutePath(instanceId, file));
+        const filesToCompressAbsolutePaths = await Promise.all(filesToCompress.map(file => getFileAbsolutePath(instanceId, file)));
+        await Promise.all(filesToCompressAbsolutePaths.map(assertSafeSourceTree));
 
         const compressId = uuidv4();
         res.status(202).json({ message: 'server.file_compress_request_accepted', compressId });
@@ -430,29 +700,29 @@ export const compressFiles = async (req, res) => {
         // --- 后台处理逻辑 ---
         (async () => {
             const sendProgress = (progress) => {
-                broadcast({
+                broadcastToInstance(instanceId, {
                     type: 'file-compress-progress',
                     compressId: compressId,
                     outputName: outputName,
                     status: 'in-progress',
                     progress: progress // 0-100
-                });
+                }, null, true);
             };
 
             const sendCompletion = (status, message) => {
-                broadcast({
+                broadcastToInstance(instanceId, {
                     type: 'file-compress-status',
                     compressId: compressId,
                     outputName: outputName,
                     status: status,
                     message: message
-                });
+                }, null, true);
                 if (status === 'success') {
-                    broadcast({
+                    broadcastToInstance(instanceId, {
                         type: 'file-change',
                         instanceId: instanceId,
                         path: destinationPath || ''
-                    });
+                    }, null, true);
                 }
             };
 
@@ -488,7 +758,7 @@ export const compressFiles = async (req, res) => {
                         });
                         return; // 阻止继续执行 exec
                     case 'tar.gz': {
-                        const archive = archiver('tar', {
+                        const archive = new TarArchive({
                             gzip: true,
                             gzipOptions: { level: compressionLevel }
                         });
@@ -538,10 +808,10 @@ export const compressFiles = async (req, res) => {
                     }
                     case 'tar.xz': {
                         // 对于 tar.xz，archiver 不直接支持 xz 压缩，需要通过管道连接到 xz 进程
-                        const archive = archiver('tar'); // 创建 tar 归档，不进行 gzip 压缩
+                        const archive = new TarArchive(); // 创建 tar 归档，不进行 gzip 压缩
 
                         const outputStream = fs.createWriteStream(absoluteOutputFilePath);
-                        const xzProcess = require('child_process').spawn('xz', ['-z', '-T0', `-`]); // -T0 使用所有可用核心，-z 压缩，-c 输出到 stdout
+                        const xzProcess = spawn('xz', ['-z', '-T0', '-c']); // -T0 使用所有可用核心，-c 输出到 stdout
 
                         archive.pipe(xzProcess.stdin); // archiver 的输出作为 xz 进程的输入
                         xzProcess.stdout.pipe(outputStream); // xz 进程的输出写入文件
@@ -643,13 +913,14 @@ export const copyFiles = async (req, res) => {
             return res.status(400).json({ message: 'server.missing_copy_details' });
         }
 
-        const absoluteDestinationPath = getFileAbsolutePath(instanceId, destination);
+        const absoluteDestinationPath = await getFileAbsolutePath(instanceId, destination, { allowMissing: true });
         await fs.ensureDir(absoluteDestinationPath);
 
         const copyOperations = files.map(async (file) => {
-            const absoluteSourcePath = getFileAbsolutePath(instanceId, file);
+            const absoluteSourcePath = await getFileAbsolutePath(instanceId, file);
+            await assertSafeSourceTree(absoluteSourcePath);
             const fileName = path.basename(file);
-            const absoluteTargetPath = path.join(absoluteDestinationPath, fileName);
+            const absoluteTargetPath = await getFileAbsolutePath(instanceId, path.join(destination, fileName), { allowMissing: true });
 
             // 检查源路径和目标路径是否在同一个实例工作目录内（getFileAbsolutePath 已处理）
             // 检查是否尝试将文件复制到其自身，或其子目录
@@ -668,7 +939,7 @@ export const copyFiles = async (req, res) => {
 
         res.status(200).json({ message: 'server.copy_success' });
         // 通知前端刷新目标目录
-        broadcast({ type: 'file-change', instanceId, path: destination });
+        broadcastToInstance(instanceId, { type: 'file-change', instanceId, path: destination }, null, true);
 
     } catch (error) {
         handleFileError(res, error, 'server.copy_file_or_directory_failed');
@@ -686,9 +957,9 @@ export const deleteMultipleFiles = async (req, res) => {
             return res.status(400).json({ message: 'server.missing_delete_paths' });
         }
 
-        const instanceCwd = req.instanceConfig.cwd || path.join(WORKSPACES_PATH, instanceId);
+        const instanceCwd = await fs.realpath(getInstanceRootPath(instanceId));
         const deleteOperations = filePaths.map(async (filePath) => {
-            const absolutePath = getFileAbsolutePath(instanceId, filePath);
+            const absolutePath = await getFileAbsolutePath(instanceId, filePath);
 
             // 防止删除实例根目录
             if (absolutePath === instanceCwd) {
@@ -704,7 +975,7 @@ export const deleteMultipleFiles = async (req, res) => {
         res.status(200).json({ message: 'server.delete_success' });
         // 通知前端刷新受影响的目录
         const affectedDirs = new Set(filePaths.map(p => path.dirname(p)));
-        affectedDirs.forEach(dir => broadcast({ type: 'file-change', instanceId, path: dir }));
+        affectedDirs.forEach(dir => broadcastToInstance(instanceId, { type: 'file-change', instanceId, path: dir }, null, true));
 
     } catch (error) {
         handleFileError(res, error, 'server.bulk_delete_failed');
@@ -722,12 +993,12 @@ export const moveFiles = async (req, res) => {
             return res.status(400).json({ message: 'server.missing_move_details' });
         }
 
-        const absoluteDestinationPath = getFileAbsolutePath(instanceId, destination);
+        const absoluteDestinationPath = await getFileAbsolutePath(instanceId, destination);
 
         const moveOperations = files.map(async (file) => {
-            const absoluteSourcePath = getFileAbsolutePath(instanceId, file);
+            const absoluteSourcePath = await getFileAbsolutePath(instanceId, file);
             const fileName = path.basename(file);
-            const absoluteTargetPath = path.join(absoluteDestinationPath, fileName);
+            const absoluteTargetPath = await getFileAbsolutePath(instanceId, path.join(destination, fileName), { allowMissing: true });
 
             // 检查源路径和目标路径是否在同一个实例工作目录内（getFileAbsolutePath 已处理）
             // 检查是否尝试将文件移动到其自身，或其子目录
@@ -747,8 +1018,8 @@ export const moveFiles = async (req, res) => {
         res.status(200).json({ message: 'server.move_success' });
         // 通知前端刷新源目录和目标目录
         const sourceDirs = new Set(files.map(p => path.dirname(p)));
-        sourceDirs.forEach(dir => broadcast({ type: 'file-change', instanceId, path: dir }));
-        broadcast({ type: 'file-change', instanceId, path: destination });
+        sourceDirs.forEach(dir => broadcastToInstance(instanceId, { type: 'file-change', instanceId, path: dir }, null, true));
+        broadcastToInstance(instanceId, { type: 'file-change', instanceId, path: destination }, null, true);
 
     } catch (error) {
         handleFileError(res, error, 'server.move_file_or_directory_failed');

@@ -2,17 +2,19 @@ import path from 'path';
 import fs from 'fs-extra';
 import pty from 'node-pty';
 import Docker from 'dockerode';
-import os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { PassThrough } from 'stream';
 import { readDb, writeDb } from '../data/db.js';
-import { INSTANCES_DB_PATH, WORKSPACES_PATH, SHELL } from '../config.js';
-import { broadcast } from '../websocket/handler.js';
+import { INSTANCES_DB_PATH, WORKSPACES_PATH } from '../config.js';
+import { broadcastToInstance } from '../websocket/handler.js';
+import { isPathWithinRoot } from './fileManager.js';
+import { appendTerminalHistory, buildShellLaunch, truncateTerminalOutput } from './terminalSecurity.js';
+import { containerBelongsToComposeInstance } from './dockerSecurity.js';
 import i18n from '../utils/i18n.js';
 
 const execAsync = promisify(exec);
 const docker = new Docker();
-const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
 // K: instanceId, V: { pty, listeners, history, ... }
 export const activeInstances = new Map();
 export const stoppedInstancesHistory = new Map();
@@ -185,14 +187,13 @@ export async function startInstance(instanceConfig) {
                     if (isTty) {
                         stream.on('data', handler);
                     } else {
-                        const { PassThrough } = require('stream');
                         const stdout = new PassThrough();
                         const stderr = new PassThrough();
 
                         docker.modem.demuxStream(stream, stdout, stderr);
 
-                        stdout.on('data', normalizeOutput(handler));
-                        stderr.on('data', normalizeOutput(handler));
+                        stdout.on('data', data => handler(normalizeOutput(data)));
+                        stderr.on('data', data => handler(normalizeOutput(data)));
                     }
                 }
 
@@ -221,11 +222,15 @@ export async function startInstance(instanceConfig) {
         };
 
     } else {
+        const launch = buildShellLaunch(instanceCwd, commandToExecute, instanceConfig.env, instanceConfig.sandboxEnabled !== false);
+        if (instanceConfig.sandboxEnabled !== false && !launch.sandboxed) {
+            console.warn(`Shell sandbox unavailable for instance ${instanceConfig.id}: ${launch.sandboxReason || 'disabled'}`);
+        }
         const ptyOptions = {
             name: 'xterm-color', cols: 80, rows: 30, cwd: instanceCwd,
-            env: { ...process.env, ...(instanceConfig.env || {}) }
+            env: launch.env
         };
-        term = pty.spawn(shell, ['-c', commandToExecute], ptyOptions);
+        term = pty.spawn(launch.file, launch.args, ptyOptions);
         term.destroy = () => {}; 
     }
 
@@ -240,17 +245,12 @@ export async function startInstance(instanceConfig) {
     };
     activeInstances.set(instanceConfig.id, session);
 
-    broadcast({ type: 'event', event: 'instance-started', id: instanceConfig.id });
+    broadcastToInstance(instanceConfig.id, { type: 'event', event: 'instance-started', id: instanceConfig.id });
 
     term.on('data', (data) => {
         const output = data.toString('utf8');
-        session.history += output;
-        // 限制每次发送的数据量为 4KB
-        const MAX_OUTPUT_SIZE = 4096;
-        const truncatedOutput = output.length > MAX_OUTPUT_SIZE 
-            ? output.slice(-MAX_OUTPUT_SIZE) 
-            : output;
-        console.log(`[WS Output] Original: ${output.length} bytes, Sent: ${truncatedOutput.length} bytes`);
+        session.history = appendTerminalHistory(session.history, output);
+        const truncatedOutput = truncateTerminalOutput(output);
         session.listeners.forEach(ws => {
             if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceConfig.id, data: truncatedOutput }));
         });
@@ -269,16 +269,14 @@ export async function startInstance(instanceConfig) {
             session.restartTimeout = null;
         }
 
-        // Save history before removing session
-        stoppedInstancesHistory.set(instanceConfig.id, session.history);
-
         // Ensure active session is removed
         activeInstances.delete(instanceConfig.id);
-        broadcast({ type: 'event', event: 'instance-stopped', id: instanceConfig.id });
+        broadcastToInstance(instanceConfig.id, { type: 'event', event: 'instance-stopped', id: instanceConfig.id });
 
         const instances = readDb(INSTANCES_DB_PATH);
         const currentInstanceIndex = instances.findIndex(i => i.id === instanceConfig.id);
         if (currentInstanceIndex !== -1) {
+            stoppedInstancesHistory.set(instanceConfig.id, session.history);
             const currentInstance = instances[currentInstanceIndex];
             // Clear dockerContainerId if it was a docker instance
             if (currentInstance.type === 'docker') {
@@ -410,15 +408,16 @@ export async function deleteInstance(instanceId, deleteData = true) {
 
         if (deleteData) {
             const cwd = instanceToDelete.cwd || path.join(WORKSPACES_PATH, instanceId);
-            if (cwd.startsWith(WORKSPACES_PATH)) {
+            if (path.resolve(cwd) !== path.resolve(WORKSPACES_PATH) && isPathWithinRoot(WORKSPACES_PATH, cwd)) {
                 fs.removeSync(cwd);
                 console.log(i18n.t('server.instance_working_directory_deleted', { instanceId: instanceId }));
             }
         }
 
+        broadcastToInstance(instanceId, { type: 'event', event: 'instance-deleted', id: instanceId });
         instances = instances.filter(i => i.id !== instanceId);
         writeDb(INSTANCES_DB_PATH, instances);
-        broadcast({ type: 'event', event: 'instance-deleted', id: instanceId });
+        stoppedInstancesHistory.delete(instanceId);
         console.log(i18n.t('server.instance_removed_from_db', { instanceId: instanceId }));
     }
 }
@@ -462,17 +461,14 @@ export async function getDockerComposeContainers(instanceId) {
     const instance = getInstanceById(instanceId);
     if (!instance || instance.type !== 'docker_compose') return [];
     
-    // Project name is usually directory name of CWD
-    const projectName = path.basename(instance.cwd); 
-    
     try {
         const containers = await docker.listContainers({
             filters: {
-                label: [`com.docker.compose.project=${projectName}`]
+                label: ['com.docker.compose.project.working_dir']
             }
         });
         
-        return containers.map(c => ({
+        return containers.filter(c => containerBelongsToComposeInstance(instance, { Config: { Labels: c.Labels } })).map(c => ({
             id: c.Id,
             name: c.Names[0].replace(/^\//, ''), // remove leading slash
             state: c.State,
@@ -491,13 +487,13 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
     const instanceConfig = getInstanceById(instanceId);
     if (!instanceConfig || instanceConfig.type !== 'docker_compose') throw new Error('Not a docker compose instance');
 
-    const container = docker.getContainer(containerName); // containerName should be ID or Name? usually Name is unique enough or ID.
-    // If passing Name (which we get from getDockerComposeContainers), we might need to find ID or just use Name if dockerode supports it.
-    // Dockerode getContainer takes ID or Name.
-    
     try {
-        // Verify container exists and belongs to this project?
-        // Skipped for brevity, assuming frontend sends valid name from list.
+        if (typeof containerName !== 'string' || !containerName) throw new Error('Invalid container name');
+        const container = docker.getContainer(containerName);
+        const inspectData = await container.inspect();
+        if (!containerBelongsToComposeInstance(instanceConfig, inspectData)) {
+            throw new Error('Container does not belong to this Compose instance');
+        }
         
         // 1. "Detach" current term.
         // We can't easily "detach" the listeners added in `startInstance` without keeping references.
@@ -515,7 +511,6 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
         }
         
         // 2. Attach new
-        const inspectData = await container.inspect();
         const isTty = inspectData.Config.Tty;
 
         const stream = await container.attach({
@@ -528,7 +523,7 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
 
         // Update history? Maybe print a message.
         const switchMsg = `\r\n\x1b[33m--- Switched to container: ${containerName} ---\x1b[0m\r\n`;
-        session.history += switchMsg;
+        session.history = appendTerminalHistory(session.history, switchMsg);
          session.listeners.forEach(ws => {
             if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceId, data: switchMsg }));
         });
@@ -591,7 +586,7 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
         // Re-bind data listener
         term.on('data', (data) => {
             const output = data.toString('utf8');
-            session.history += output;
+            session.history = appendTerminalHistory(session.history, output);
             session.listeners.forEach(ws => {
                 if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceId, data: output }));
             });

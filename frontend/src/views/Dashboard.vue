@@ -96,10 +96,7 @@ const filteredInstances = computed(() => {
 
 const canManage = (instance) => {
     const user = sessionStore.currentUser;
-    if (!user) return false;
-    if (user.role === 'admin') return true;
-    const perms = instance.permissions?.[user.id];
-    return perms?.terminal === 'full-control';
+    return user?.role === 'admin';
 };
 
 const openSettings = (instance) => {

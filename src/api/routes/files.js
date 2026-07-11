@@ -9,12 +9,12 @@ const router = express.Router({ mergeParams: true });
 router.use(checkFileManagerPermission);
 
 // --- 文件和目录的读写操作 ---
-router.get('/files/*', fileController.listFiles);
-router.get('/file-content/*', fileController.getFileContent);
-router.get('/download/*', fileController.downloadFile);
-router.post('/files/*', fileController.createDirectory); // 创建目录
-router.put('/files/*', fileController.createFile);       // 创建/更新文件
-router.delete('/files/*', fileController.deletePath);    // 删除文件或目录
+router.get(/^\/files\/(.*)$/, fileController.listFiles);
+router.get(/^\/file-content\/(.*)$/, fileController.getFileContent);
+router.get(/^\/download\/(.*)$/, fileController.downloadFile);
+router.post(/^\/files\/(.*)$/, fileController.createDirectory); // 创建目录
+router.put(/^\/files\/(.*)$/, fileController.createFile);       // 创建/更新文件
+router.delete(/^\/files\/(.*)$/, fileController.deletePath);    // 删除文件或目录
 router.post('/rename', fileController.renamePath);
 
 // --- 文件上传 ---

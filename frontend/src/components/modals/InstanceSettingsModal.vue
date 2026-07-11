@@ -1,5 +1,5 @@
 <template>
-  <div class="modal fade" tabindex="-1" ref="modalEle">
+  <div class="modal fade" data-modal-name="instanceSettings" tabindex="-1" ref="modalEle">
     <div class="modal-dialog modal-lg">
       <div class="modal-content" v-if="form">
           <form @submit.prevent="handleSubmit">
@@ -93,6 +93,19 @@
                   :placeholder="$t('instances.workdir.placeholder')">
                 <div class="form-text">{{ $t('instances.workdir.hint') }}</div>
               </div>
+              <div v-if="form.type === 'shell'" class="mb-3">
+                <div v-if="shellSandboxSupported" class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" id="settings-shell-sandbox"
+                    v-model="form.sandboxEnabled">
+                  <label class="form-check-label" for="settings-shell-sandbox">{{ $t('instances.sandbox.enabled') }}</label>
+                </div>
+                <div v-if="!shellSandboxSupported" class="alert alert-danger py-2 mb-0" role="alert">
+                  {{ $t('instances.sandbox.unsupported') }}
+                </div>
+                <div v-else-if="!form.sandboxEnabled" class="alert alert-danger py-2 mt-2 mb-0" role="alert">
+                  {{ $t('instances.sandbox.disabled.warning') }}
+                </div>
+              </div>
               <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" role="switch" id="settings-autostart"
                   v-model="form.autoStartOnBoot">
@@ -184,6 +197,7 @@ let modal = null;
 
 const form = ref(null);
 const deleteTarget = ref({});
+const shellSandboxSupported = computed(() => uiStore.capabilities?.shellSandbox?.supported === true);
 
 const envString = computed({
     get: () => form.value?.env ? Object.entries(form.value.env).map(([k, v]) => `${k}=${v}`).join('\n') : '',
@@ -279,7 +293,8 @@ onMounted(() => {
     });
     // Initial display based on uiStore.modals.instanceSettings
     if (uiStore.modals.instanceSettings) {
-        form.value = JSON.parse(JSON.stringify(props.instance));
+      form.value = JSON.parse(JSON.stringify(props.instance));
+      form.value.sandboxEnabled ??= true;
         loadDockerComposeContent();
         modal.show();
     }
@@ -293,13 +308,15 @@ onBeforeUnmount(() => {
 
 watch(() => props.instance, (newInstance) => {
     if (newInstance) {
-        form.value = JSON.parse(JSON.stringify(newInstance));
+      form.value = JSON.parse(JSON.stringify(newInstance));
+      form.value.sandboxEnabled ??= true;
     }
 }, { immediate: true });
 
 watch(() => uiStore.modals.instanceSettings, async (isVisible) => {
     if (isVisible) {
-        form.value = JSON.parse(JSON.stringify(props.instance));
+      form.value = JSON.parse(JSON.stringify(props.instance));
+      form.value.sandboxEnabled ??= true;
         await loadDockerComposeContent();
         modal.show();
     } else {
@@ -341,21 +358,20 @@ const handleSubmit = async () => {
         return;
     }
 
-    const payload = { ...form.value };
-    payload.env = envString.value.split('\n').reduce((acc, line) => {
-        const [key, ...val] = line.split('=');
-        if (key) acc[key] = val.join('=');
-        return acc;
-    }, {});
-
-    if (payload.type === 'docker') {
-        // Ports and volumes are already in string array format from the modals
-        // No need to re-parse them here.
-    } else if (payload.type === 'docker_compose') {
+    const isAdmin = sessionStore.currentUser?.role === 'admin';
+    const payload = isAdmin ? { ...form.value } : { name: form.value.name };
+    if (isAdmin) {
+      payload.env = envString.value.split('\n').reduce((acc, line) => {
+          const [key, ...val] = line.split('=');
+          if (key) acc[key] = val.join('=');
+          return acc;
+      }, {});
+      if (payload.type === 'docker_compose') {
         delete payload.dockerConfig;
-    } else {
+      } else if (payload.type === 'shell') {
         delete payload.dockerConfig;
         delete payload.dockerComposeContent;
+      }
     }
 
     await instancesStore.updateInstance(props.instance.id, payload);

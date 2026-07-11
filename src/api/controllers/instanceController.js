@@ -2,7 +2,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { readDb, writeDb } from '../../data/db.js';
 import { INSTANCES_DB_PATH, USERS_DB_PATH, WORKSPACES_PATH } from '../../config.js';
 import * as instanceManager from '../../core/instanceManager.js';
-import { broadcast } from '../../websocket/handler.js';
+import { broadcastToInstance } from '../../websocket/handler.js';
+import { serializeInstance } from '../serializers/instanceSerializer.js';
 import path from 'path';
 import fs from 'fs-extra';
 
@@ -14,18 +15,22 @@ export const getAllInstances = (req, res) => {
         ? instances
         : instances.filter(i => i.permissions && i.permissions[user.id]);
 
-    const result = viewableInstances.map(i => ({
-        ...i,
-        status: instanceManager.activeInstances.has(i.id) ? 'running' : 'stopped'
-    }));
+    const result = viewableInstances.map(instance => serializeInstance(
+        instance,
+        user,
+        instanceManager.activeInstances.has(instance.id) ? 'running' : 'stopped'
+    ));
     res.json(result);
 };
 
 export const createInstance = (req, res) => {
-    const { name, command, cwd, type, autoStartOnBoot, autoDeleteOnExit, autoRestart, env, dockerConfig, dockerComposeContent } = req.body;
+    const { name, command, cwd, type, autoStartOnBoot, autoDeleteOnExit, autoRestart, env, dockerConfig, dockerComposeContent, sandboxEnabled } = req.body;
+    if (type !== undefined && !['shell', 'docker', 'docker_compose'].includes(type)) return res.status(400).json({ message: 'server.invalid_action' });
     if (!command && type !== 'docker' && type !== 'docker_compose') return res.status(400).json({ message: 'server.command_required' });
     if (type === 'docker' && !dockerConfig?.image) return res.status(400).json({ message: 'server.image_required' });
     if (type === 'docker_compose' && !dockerComposeContent) return res.status(400).json({ message: 'server.docker_compose_not_found' });
+    if (sandboxEnabled !== undefined && typeof sandboxEnabled !== 'boolean') return res.status(400).json({ message: 'server.invalid_action' });
+    if (cwd !== undefined && cwd !== '' && (typeof cwd !== 'string' || !path.isAbsolute(cwd))) return res.status(400).json({ message: 'server.invalid_action' });
 
     const id = uuidv4();
     const finalCwd = cwd || path.join(WORKSPACES_PATH, id);
@@ -53,6 +58,7 @@ export const createInstance = (req, res) => {
         autoStartOnBoot: !!autoStartOnBoot,
         autoDeleteOnExit: !!autoDeleteOnExit,
         autoRestart: !!autoRestart,
+        sandboxEnabled: (type || 'shell') === 'shell' ? sandboxEnabled !== false : undefined,
         env: env || {},
         dockerConfig: dockerConfig || {},
         permissions: { [req.session.user.id]: { terminal: 'full-control', fileManagement: true } }
@@ -62,32 +68,45 @@ export const createInstance = (req, res) => {
     instances.push(newInstance);
     writeDb(INSTANCES_DB_PATH, instances);
     
-    broadcast({ type: 'event', event: 'instance-created', instance: { ...newInstance, status: 'stopped' } });
+    broadcastToInstance(id, user => ({
+        type: 'event',
+        event: 'instance-created',
+        instance: serializeInstance(newInstance, user, 'stopped')
+    }));
     res.status(201).json(newInstance);
 };
 
 export const updateInstance = (req, res) => {
     const { id } = req.params;
-    const { permissions, dockerComposeContent, ...updates } = req.body; // 禁止通过此 API 更新权限
-    
+    const adminFields = ['name', 'type', 'command', 'cwd', 'autoStartOnBoot', 'autoDeleteOnExit', 'autoRestart', 'sandboxEnabled', 'env', 'dockerConfig'];
+    const allowedFields = req.session.user.role === 'admin' ? adminFields : ['name'];
+    const updates = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowedFields.includes(key)));
+    const dockerComposeContent = req.session.user.role === 'admin' ? req.body.dockerComposeContent : undefined;
+
+    const rejectedFields = Object.keys(req.body).filter(key => !allowedFields.includes(key) && key !== 'dockerComposeContent');
+    if (rejectedFields.length > 0 || (req.session.user.role !== 'admin' && req.body.dockerComposeContent !== undefined)) {
+        return res.status(403).json({ message: 'server.no_field_perms' });
+    }
+
     const instances = readDb(INSTANCES_DB_PATH, []);
     const instanceIndex = instances.findIndex(i => i.id === id);
     if (instanceIndex === -1) return res.status(404).json({ message: 'server.instance_not_found' });
     
-    // 只有管理员可以更新某些敏感字段
-    if (req.session.user.role !== 'admin') {
-        const disallowedUpdates = ['autoStartOnBoot', 'autoDeleteOnExit', 'autoRestart', 'type', 'command', 'dockerConfig', 'env', 'dockerComposeContent'];
-        for (const field of disallowedUpdates) {
-             // check if updates has it (dockerComposeContent is extracted, so check variable)
-            if ((field === 'dockerComposeContent' && dockerComposeContent !== undefined) || (updates[field] !== undefined && updates[field] !== instances[instanceIndex][field])) {
-                return res.status(403).json({ message: 'server.no_field_perms' });
-            }
-        }
+    if (updates.cwd !== undefined && (typeof updates.cwd !== 'string' || !path.isAbsolute(updates.cwd))) {
+        return res.status(400).json({ message: 'server.invalid_action' });
+    }
+    if (updates.sandboxEnabled !== undefined && typeof updates.sandboxEnabled !== 'boolean') {
+        return res.status(400).json({ message: 'server.invalid_action' });
     }
 
     const currentInstance = instances[instanceIndex];
     const effectiveType = updates.type || currentInstance.type;
     const effectiveCwd = updates.cwd || currentInstance.cwd;
+    if (effectiveType === 'shell' && updates.sandboxEnabled === undefined && currentInstance.sandboxEnabled === undefined) {
+        updates.sandboxEnabled = true;
+    } else if (effectiveType !== 'shell') {
+        updates.sandboxEnabled = undefined;
+    }
 
     if (effectiveType === 'docker_compose' && dockerComposeContent !== undefined) {
          try {
@@ -101,7 +120,12 @@ export const updateInstance = (req, res) => {
     instances[instanceIndex] = { ...instances[instanceIndex], ...updates };
     writeDb(INSTANCES_DB_PATH, instances);
 
-    broadcast({ type: 'event', event: 'instance-updated', instance: instances[instanceIndex] });
+    const updatedInstance = instances[instanceIndex];
+    broadcastToInstance(id, user => ({
+        type: 'event',
+        event: 'instance-updated',
+        instance: serializeInstance(updatedInstance, user)
+    }));
     res.json(instances[instanceIndex]);
 };
 
@@ -155,6 +179,13 @@ export const handleInstanceAction = async (req, res) => {
 export const updateInstancePermissions = (req, res) => {
     const { instanceId, userId } = req.params;
     const { terminal, fileManagement } = req.body;
+    const validTerminalPermissions = [null, 'read-only', 'read-write', 'read-write-ops', 'full-control'];
+    if (terminal !== undefined && !validTerminalPermissions.includes(terminal)) {
+        return res.status(400).json({ message: 'server.invalid_action' });
+    }
+    if (fileManagement !== undefined && typeof fileManagement !== 'boolean') {
+        return res.status(400).json({ message: 'server.invalid_action' });
+    }
     
     let instances = readDb(INSTANCES_DB_PATH, []);
     const instanceIndex = instances.findIndex(i => i.id === instanceId);
@@ -177,12 +208,17 @@ export const updateInstancePermissions = (req, res) => {
     }
     
     writeDb(INSTANCES_DB_PATH, instances);
-    broadcast({ type: 'event', event: 'instance-updated', instance });
+    broadcastToInstance(instanceId, user => ({
+        type: 'event',
+        event: 'instance-updated',
+        instance: serializeInstance(instance, user)
+    }));
     res.json({ message: 'Permissions updated', instance });
 };
 
 export const getInstancePermissions = (req, res) => {
-    const instance = req.instanceConfig; // 从中间件获取
+    const instance = readDb(INSTANCES_DB_PATH, []).find(item => item.id === req.params.instanceId);
+    if (!instance) return res.status(404).json({ message: 'server.instance_not_found' });
     res.json(instance.permissions || {});
 };
 

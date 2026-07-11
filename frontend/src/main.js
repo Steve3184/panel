@@ -6,27 +6,32 @@ import { i18nPlugin, useI18n } from './composables/useI18n'
 import router from './router'
 import './style.css'
 import App from './App.vue'
-import api from './services/api' // 导入 api 服务
+import api from './services/api'
 import { useUiStore } from './stores/ui'
 
 async function initializeApp() {
     const app = createApp(App)
-    app.use(createPinia())
+    const pinia = createPinia()
+    app.use(pinia)
     // 在 i18n 加载前获取面板设置
     let panelSettings = {};
-    try {
-        const api = (await import('./services/api')).default; // 动态导入 api 服务
-        panelSettings = await api.getPanelSettings();
-    } catch (error) {
-        console.error(error);
-    }
+    let capabilities = { platform: null, shellSandbox: { supported: false, reason: 'not-checked' } };
+    const [panelSettingsResult, capabilitiesResult] = await Promise.allSettled([
+        api.getPublicPanelSettings(),
+        api.getCapabilities()
+    ]);
+    if (panelSettingsResult.status === 'fulfilled') panelSettings = panelSettingsResult.value;
+    else console.error(panelSettingsResult.reason);
+    if (capabilitiesResult.status === 'fulfilled') capabilities = capabilitiesResult.value;
+    else console.error(capabilitiesResult.reason);
 
     app.use(i18nPlugin, { panelSettings });
     app.use(router)
-    app.mount('#app')
-    const uiStore = useUiStore();
+    const uiStore = useUiStore(pinia);
     uiStore.panelSettings = panelSettings;
+    uiStore.capabilities = capabilities;
     uiStore.updatePanelLogo(panelSettings.panelLogo);
+    app.mount('#app')
 }
 
 initializeApp();

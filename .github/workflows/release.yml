@@ -7,6 +7,10 @@ on:
     paths:
       - 'src/**'
       - 'frontend/**'
+      - 'scripts/**'
+      - '.github/workflows/release.yml'
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: write
@@ -19,10 +23,12 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             arch: x64
+            sandbox_arch: amd64
             artifact_name: linux-x64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
             platform: linux
             arch: arm64
+            sandbox_arch: arm64
             artifact_name: linux-arm64
           - os: windows-latest
             platform: win32
@@ -53,6 +59,10 @@ jobs:
       - name: Build frontend
         run: npm run build
         working-directory: ./frontend
+
+      - name: Build bundled Bubblewrap
+        if: matrix.platform == 'linux'
+        run: ./scripts/build-bubblewrap.sh bundled-tools ${{ matrix.sandbox_arch }}
       
       - name: Create Backend Release Archive
         shell: bash
@@ -63,6 +73,14 @@ jobs:
           cp -r node_modules release/
           cp package.json release/
           cp LICENSE release/
+
+          if [ "${{ matrix.platform }}" == "linux" ]; then
+            mkdir -p release/bin release/THIRD_PARTY_LICENSES
+            cp bundled-tools/bwrap release/bin/bwrap
+            cp bundled-tools/VERSION release/bin/bwrap.VERSION
+            cp bundled-tools/COPYING release/THIRD_PARTY_LICENSES/bubblewrap.txt
+            (cd release/bin && sha256sum bwrap > bwrap.sha256)
+          fi
           
           mkdir -p release/frontend/public
           cp -r frontend/dist release/frontend/

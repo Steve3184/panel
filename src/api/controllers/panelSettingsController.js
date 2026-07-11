@@ -16,6 +16,13 @@ export let panelSettings = {
 
 let currentTunnel = null; // 用于存储当前的 Gradio Tunnel 实例
 
+function detectImageMime(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return null;
+}
+
 async function loadSettings() {
   try {
     const data = await fs.readFile(SETTINGS_FILE, 'utf8');
@@ -32,7 +39,9 @@ async function loadSettings() {
 
 async function saveSettings() {
   try {
+    await fs.mkdir(path.dirname(SETTINGS_FILE), { recursive: true, mode: 0o700 });
     await fs.writeFile(SETTINGS_FILE, JSON.stringify(panelSettings, null, 2), 'utf8');
+    await fs.chmod(SETTINGS_FILE, 0o600);
   } catch (error) {
     console.error('Error saving settings:', error);
   }
@@ -49,13 +58,19 @@ async function startTunnel() {
     }
   }
 }
-// Load settings on startup
-loadSettings().then(startTunnel);
+export const panelSettingsReady = loadSettings().then(startTunnel);
 
 export const getPanelSettings = (req, res) => {
   res.json({
     ...panelSettings,
     gradioTunnelUrl: currentTunnel ? currentTunnel.url : null
+  });
+};
+
+export const getPublicPanelSettings = (req, res) => {
+  res.json({
+    panelName: panelSettings.panelName,
+    panelLogo: panelSettings.panelLogo
   });
 };
 
@@ -122,7 +137,11 @@ export const uploadBackgroundImage = async (req, res) => {
         return; // Response already sent
       }
       try {
-        await fs.writeFile(BGIMAGE_PATH, fileBuffer);
+        if (!detectImageMime(fileBuffer)) {
+          return res.status(400).json({ message: 'server.invalid_file_details' });
+        }
+        await fs.writeFile(BGIMAGE_PATH, fileBuffer, { mode: 0o600 });
+        await fs.chmod(BGIMAGE_PATH, 0o600);
         res.status(200).json({ message: 'server.ok' });
       } catch (error) {
         console.error('Error saving background image:', error);
@@ -142,6 +161,10 @@ export const uploadBackgroundImage = async (req, res) => {
 export const getBackgroundImage = async (req, res) => {
   try {
     await fs.access(BGIMAGE_PATH);
+    const header = await fs.readFile(BGIMAGE_PATH);
+    const mime = detectImageMime(header);
+    if (!mime) return res.status(415).json({ message: 'server.invalid_file_details' });
+    res.type(mime);
     res.sendFile(path.resolve(BGIMAGE_PATH));
   } catch (error) {
     if (error.code === 'ENOENT') {

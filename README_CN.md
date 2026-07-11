@@ -61,6 +61,7 @@
 *   **Unzip**: 用于解压发布包
 *   **Docker**: （可选）用于容器管理
 *   **7-Zip**: （可选）用于高级压缩功能
+*   **Bubblewrap**：Linux 发布包已内置；从源码运行时需要单独安装
 
 **注意**：使用预构建版本时**无需**安装 Node.js，因为所有依赖已包含在内。
 
@@ -71,7 +72,7 @@
 
 **Linux x64 系统：**
 ```bash
-# 1. 安装unzip和wget
+# 1. 安装 unzip 和 wget
 sudo apt install -y unzip wget
 
 # 2. 下载并解压
@@ -80,6 +81,10 @@ sudo wget https://github.com/Steve3184/panel/releases/download/latest/release-li
 sudo unzip release-linux-x64.zip && sudo rm release-linux-x64.zip
 
 # 3. 配置 Systemd 服务
+sudo useradd --system --home-dir /opt/panel --shell /usr/sbin/nologin panel 2>/dev/null || true
+sudo chown -R panel:panel /opt/panel
+# 仅使用 Docker 实例时需要：
+sudo usermod -aG docker panel
 sudo wget -O /etc/systemd/system/panel.service https://raw.githubusercontent.com/Steve3184/panel/main/panel.service
 sudo systemctl daemon-reload
 sudo systemctl enable panel
@@ -110,7 +115,7 @@ sudo unzip release-linux-arm64.zip && sudo rm release-linux-arm64.zip
 1.  **安装 Node.js 22：**
     ```bash
     curl -sL https://deb.nodesource.com/setup_22.x | bash -
-    sudo apt install -y nodejs
+    sudo apt install -y nodejs bubblewrap
     ```
 
 2.  **克隆仓库：**
@@ -129,6 +134,10 @@ sudo unzip release-linux-arm64.zip && sudo rm release-linux-arm64.zip
 
 4.  **配置服务：**
     ```bash
+    sudo useradd --system --home-dir /opt/panel --shell /usr/sbin/nologin panel 2>/dev/null || true
+    sudo chown -R panel:panel /opt/panel
+    # 仅使用 Docker 实例时需要：
+    sudo usermod -aG docker panel
     sudo cp panel.service /etc/systemd/system/
     # 如果路径不是 /opt/panel，请编辑服务文件
     sudo systemctl daemon-reload
@@ -150,20 +159,27 @@ sudo unzip release-linux-arm64.zip && sudo rm release-linux-arm64.zip
 
 | 变量名 | 描述 | 默认值 |
 | :--- | :--- | :--- |
-| `SESSION_SECRET` | 用于签名会话 ID cookie 的密钥。**生产环境中请务必修改此项。** | |
+| `SESSION_SECRET` | 可选的会话签名与加密密钥（至少 32 字节）。未设置时会在数据目录自动生成并持久化随机密钥。 | 自动生成 |
 | `PORT` | 服务器监听的端口。 | `3000` |
 | `PANEL_LANG` | 服务端语言设置（例如 `jp`, `en`, `zh_CN`）。 | `en` |
+| `PANEL_DATA_DIR` | 数据库、会话、工作区及临时上传文件的可选存放目录。 | 项目目录 |
+| `TRUST_PROXY_HOPS` | 面板前方可信反向代理的层数。直接访问时请勿设置。 | `0` |
+| `BWRAP_BIN` | 可选的 Bubblewrap 可执行文件绝对路径；未设置时依次检查内置版本和常见系统路径。 | 自动检测 |
 
 **在 `panel.service` 中设置变量：**
 编辑 `/etc/systemd/system/panel.service` 并在 `[Service]` 下方添加 `Environment` 行：
 
 ```ini
 [Service]
-Environment="SESSION_SECRET=MySuperSecretKey123"
+Environment="SESSION_SECRET=replace-with-at-least-32-random-bytes"
 Environment="PORT=8080"
 ExecStart=/usr/bin/node src/server.js
 ```
 *注意：修改后请运行 `sudo systemctl daemon-reload && sudo systemctl restart panel` 使配置生效。*
+
+Shell 实例默认启用沙箱。Linux 发布包内置静态链接的 Bubblewrap；源码安装可以通过 `BWRAP_BIN` 指定或使用系统安装版本。Panel 启动时会实际执行沙箱能力探针。如果当前平台或内核不支持，前端将隐藏开关并显示安全警告，Shell 实例启动时也会忽略已保存的沙箱设置。Windows 不支持 Bubblewrap，因此原生 Shell 实例不会获得此隔离；不可信的 Windows 工作负载应使用 Docker。
+
+沙箱可用时会将实例工作目录映射为 `/workspace`，仅提供只读系统运行库，并隐藏面板数据库、会话、Docker socket 和其他主机路径。管理员可以按实例关闭隔离，但关闭后进程将拥有与 `panel` 系统账户相同的文件和服务访问能力。
 
 ### 🌍 远程访问 (Gradio 隧道)
 面板内置了基于 Gradio 的隧道功能，无需配置路由器端口转发或搭建 FRP，即可在公网访问您的面板。

@@ -1,4 +1,6 @@
 import fs from 'fs-extra';
+import path from 'path';
+import crypto from 'crypto';
 
 /**
  * 从 JSON 文件中读取数据。
@@ -8,13 +10,13 @@ import fs from 'fs-extra';
  */
 export function readDb(filePath, defaultValue = []) {
     try {
-        if (!fs.existsSync(filePath) || fs.readFileSync(filePath, 'utf8').trim() === '') {
-            return defaultValue;
-        }
-        return fs.readJsonSync(filePath);
+        if (!fs.existsSync(filePath)) return defaultValue;
+        const content = fs.readFileSync(filePath, 'utf8');
+        if (content.trim() === '') throw new Error('Database file is empty.');
+        return JSON.parse(content);
     } catch (e) {
         console.error(`Error reading or parsing DB file at ${filePath}:`, e);
-        return defaultValue;
+        throw e;
     }
 }
 
@@ -24,9 +26,31 @@ export function readDb(filePath, defaultValue = []) {
  * @param {any} data 要写入的数据
  */
 export function writeDb(filePath, data) {
+    let tempPath;
     try {
-        fs.writeJsonSync(filePath, data, { spaces: 2 });
+        const directory = path.dirname(filePath);
+        fs.ensureDirSync(directory, 0o700);
+        tempPath = path.join(directory, `.${path.basename(filePath)}.${process.pid}.${crypto.randomBytes(8).toString('hex')}.tmp`);
+        const descriptor = fs.openSync(tempPath, 'wx', 0o600);
+        try {
+            fs.writeFileSync(descriptor, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+            fs.fsyncSync(descriptor);
+        } finally {
+            fs.closeSync(descriptor);
+        }
+        fs.renameSync(tempPath, filePath);
+        fs.chmodSync(filePath, 0o600);
+        if (process.platform !== 'win32') {
+            const directoryDescriptor = fs.openSync(directory, 'r');
+            try {
+                fs.fsyncSync(directoryDescriptor);
+            } finally {
+                fs.closeSync(directoryDescriptor);
+            }
+        }
     } catch (e) {
+        if (tempPath) fs.removeSync(tempPath);
         console.error(`Error writing to DB file at ${filePath}:`, e);
+        throw e;
     }
 }

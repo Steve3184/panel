@@ -32,6 +32,21 @@ export const checkInstancePermission = (req, res, next) => {
     next();
 };
 
+const permissionLevels = {
+    'read-only': 1,
+    'read-write': 2,
+    'read-write-ops': 3,
+    'full-control': 4
+};
+
+export const requireInstancePermission = (requiredPermission) => (req, res, next) => {
+    if (req.session.user?.role === 'admin') return next();
+    if ((permissionLevels[req.instancePermission] || 0) < (permissionLevels[requiredPermission] || Infinity)) {
+        return res.status(403).json({ message: 'server.no_perms' });
+    }
+    next();
+};
+
 /**
  * 文件管理权限检查中间件。
  */
@@ -88,13 +103,6 @@ export function checkUserInstancePermission(user, instanceId, requiredTerminalPe
     if (requiredTerminalPermission !== null) {
         const terminalPermission = userPermissions.terminal;
         if (!terminalPermission) return false;
-        
-        const permissionLevels = {
-            'read-only': 1,
-            'read-write': 2,
-            'read-write-ops': 3,
-            'full-control': 4
-        };
         
         if (permissionLevels[terminalPermission] < permissionLevels[requiredTerminalPermission]) {
             return false;

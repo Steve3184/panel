@@ -50,7 +50,7 @@
                       </ul>
                   </div>
               </div>
-              <div class="btn-group" v-if="canFullControl">
+              <div class="btn-group" v-if="sessionStore.currentUser?.role === 'admin'">
                 <button class="btn btn-secondary" @click="openSettings">
                   <i class="bi bi-gear-fill"></i>
                 </button>
@@ -125,7 +125,6 @@ const userPermission = computed(() => {
 });
 
 const canOperate = computed(() => ['read-write-ops', 'full-control'].includes(userPermission.value));
-const canFullControl = computed(() => userPermission.value === 'full-control');
 const isTerminalReadOnly = computed(() => userPermission.value === 'read-only');
 
 const fetchComposeContainers = async () => {

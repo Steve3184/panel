@@ -3,11 +3,27 @@ import { activeInstances, stoppedInstancesHistory, switchDockerComposeContainer 
 import { getFileAbsolutePath } from '../core/fileManager.js';
 import { checkUserInstancePermission } from '../api/middleware/permissions.js';
 import i18n from '../utils/i18n.js';
+import { readDb } from '../data/db.js';
+import { USERS_DB_PATH } from '../config.js';
+import { isRequestOriginAllowed } from '../utils/security.js';
+import { truncateTerminalOutput } from '../core/terminalSecurity.js';
 
 const clients = new Set(); // 所有连接的 WebSocket 客户端
 const editingFileClients = new Set(); // 正在进行文件编辑的 WebSocket 客户端
 // K: filePath, V: { instanceId, absolutePath, wsClient }
 const editingFiles = new Map(); // 存储正在编辑的文件及其关联的 WebSocket 客户端
+
+function refreshWebSocketUser(ws) {
+    const user = readDb(USERS_DB_PATH, []).find(item => item.id === ws.user?.id);
+    if (!user || (user.sessionVersion || 0) !== (ws.user?.sessionVersion || 0)) return null;
+    ws.user = {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        sessionVersion: user.sessionVersion || 0
+    };
+    return ws.user;
+}
 
 /**
  * 向单个 WebSocket 客户端发送数据。
@@ -28,9 +44,18 @@ export function send(ws, data) {
 export function broadcast(data, excludeClients = new Set()) {
     const message = JSON.stringify(data);
     clients.forEach(client => {
-        if (client.readyState === 1 && !excludeClients.has(client)) {
+        if (client.readyState === 1 && !excludeClients.has(client) && refreshWebSocketUser(client)) {
             client.send(message);
         }
+    });
+}
+
+export function broadcastToInstance(instanceId, data, requiredTerminalPermission = null, checkFileManagement = false) {
+    clients.forEach(client => {
+        if (client.readyState !== 1 || !refreshWebSocketUser(client)) return;
+        if (!checkUserInstancePermission(client.user, instanceId, requiredTerminalPermission, checkFileManagement)) return;
+        const payload = typeof data === 'function' ? data(client.user) : data;
+        send(client, payload);
     });
 }
 
@@ -40,6 +65,10 @@ export function getEditingFileClients() {
 
 async function handleMessage(ws, messageData) {
     try {
+        if (!refreshWebSocketUser(ws)) {
+            ws.close(1008, 'Session expired');
+            return;
+        }
         const message = JSON.parse(messageData);
         let instance;
         if (message.id || message.instanceId) {
@@ -56,11 +85,7 @@ async function handleMessage(ws, messageData) {
                     }
                     ws.subscribedInstanceId = message.id;
                     instance.listeners.add(ws);
-                    // 限制历史记录发送量为 4KB
-                    const MAX_HISTORY_SIZE = 4096;
-                    const historyData = instance.history.length > MAX_HISTORY_SIZE 
-                        ? instance.history.slice(-MAX_HISTORY_SIZE) 
-                        : instance.history;
+                    const historyData = truncateTerminalOutput(instance.history);
                     send(ws, { type: 'output', id: message.id, data: historyData });
                 } else if (stoppedInstancesHistory.has(message.id)) {
                      // Check permission for stopped instance as well
@@ -69,11 +94,7 @@ async function handleMessage(ws, messageData) {
                         return;
                     }
                     const history = stoppedInstancesHistory.get(message.id);
-                    // 限制历史记录发送量为 4KB
-                    const MAX_HISTORY_SIZE = 4096;
-                    const historyData = history.length > MAX_HISTORY_SIZE 
-                        ? history.slice(-MAX_HISTORY_SIZE) 
-                        : history;
+                    const historyData = truncateTerminalOutput(history);
                     send(ws, { type: 'output', id: message.id, data: historyData });
                 }
                 break;
@@ -103,8 +124,7 @@ async function handleMessage(ws, messageData) {
                 break;
             case 'switch-container':
                 if (instance) {
-                    // Check permission (read-only is enough to switch view, input is checked separately)
-                    if (!checkUserInstancePermission(ws.user, message.id, 'read-only', false)) {
+                    if (!checkUserInstancePermission(ws.user, message.id, 'read-write-ops', false)) {
                         send(ws, { type: 'error', message: 'server.permission_denied_subscribe_instance' });
                         return;
                     }
@@ -123,7 +143,7 @@ async function handleMessage(ws, messageData) {
                         send(ws, { type: 'error', message: 'server.permission_denied_edit_file' });
                         return;
                     }
-                    const absolutePath = getFileAbsolutePath(instanceId, filePath);
+                    const absolutePath = await getFileAbsolutePath(instanceId, filePath);
 
                     editingFiles.set(filePath, { instanceId, absolutePath, wsClient: ws });
                     editingFileClients.add(ws); // 将此客户端加入到文件编辑客户端集合
@@ -145,7 +165,7 @@ async function handleMessage(ws, messageData) {
                         send(ws, { type: 'error', message: 'server.permission_denied_save_file' });
                         return;
                     }
-                    const absolutePathToSave = getFileAbsolutePath(saveInstanceId, saveFilePath);
+                    const absolutePathToSave = await getFileAbsolutePath(saveInstanceId, saveFilePath, { allowMissing: true });
                     await fs.writeFile(absolutePathToSave, fileContent, 'utf8');
                     send(ws, { type: 'file-saved-notification', filePath: saveFilePath, message: 'server.file_saved', closeEditor: closeEditor });
                 } catch (error) {
@@ -180,6 +200,10 @@ async function handleMessage(ws, messageData) {
  */
 export function setupWebSocket(app, sessionParser) {
     app.ws('/ws', (ws, req) => {
+        if (!isRequestOriginAllowed(req)) {
+            ws.close(1008, 'Invalid origin');
+            return;
+        }
         sessionParser(req, {}, () => {
             if (!req.session.user) {
                 return ws.close();

@@ -1,5 +1,5 @@
 <template>
-    <div class="modal fade" id="createInstanceModal" tabindex="-1" ref="modalEle">
+    <div class="modal fade" id="createInstanceModal" data-modal-name="createInstance" tabindex="-1" ref="modalEle">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
@@ -28,6 +28,19 @@
                             }}</label>
                             <input type="text" class="form-control" id="create-instance-command" v-model="form.command"
                                 :placeholder="t('instances.command.placeholder')" :required="form.type === 'shell'">
+                        </div>
+                        <div v-if="form.type === 'shell'" class="mb-3">
+                            <div v-if="shellSandboxSupported" class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="create-shell-sandbox"
+                                    v-model="form.sandboxEnabled">
+                                <label class="form-check-label" for="create-shell-sandbox">{{ $t('instances.sandbox.enabled') }}</label>
+                            </div>
+                            <div v-if="!shellSandboxSupported" class="alert alert-danger py-2 mb-0" role="alert">
+                                {{ $t('instances.sandbox.unsupported') }}
+                            </div>
+                            <div v-else-if="!form.sandboxEnabled" class="alert alert-danger py-2 mt-2 mb-0" role="alert">
+                                {{ $t('instances.sandbox.disabled.warning') }}
+                            </div>
                         </div>
 
                         <!-- Docker Compose Content -->
@@ -128,7 +141,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @click="uiStore.closeModal('createInstance')">{{
                         $t('cancel') }}</button>
-                    <button type="submit" class="btn btn-primary" form="create-instance-form">{{ $t('instances.create')
+                    <button type="button" class="btn btn-primary" @click="submitForm">{{ $t('instances.create')
                     }}</button>
                 </div>
             </div>
@@ -153,6 +166,7 @@ const fileManagerStore = useFileManagerStore(); // For volume mounting
 const modalEle = ref(null);
 const { t } = useI18n();
 let modal = null;
+const shellSandboxSupported = computed(() => uiStore.capabilities?.shellSandbox?.supported === true);
 
 const form = ref({
     name: '',
@@ -161,6 +175,7 @@ const form = ref({
     type: 'shell',
     autoStartOnBoot: false,
     autoDeleteOnExit: false,
+    sandboxEnabled: true,
     env: '', // Changed to string for textarea
     dockerComposeContent: '',
     dockerConfig: {

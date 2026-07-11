@@ -4,7 +4,8 @@ db/
 uploads_temp/
 workspaces/
 sessions/
-package-lock.json
 src/utils/frpc_*
 logs/
 .clinic/
+build/
+bundled-tools/

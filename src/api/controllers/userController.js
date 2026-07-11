@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { readDb, writeDb } from '../../data/db.js';
 import { USERS_DB_PATH, INSTANCES_DB_PATH, SALT_ROUNDS } from '../../config.js';
 import i18n from '../../utils/i18n.js';
+import { isStrongEnoughPassword } from '../../utils/security.js';
 
 export const getAllUsers = (req, res) => {
     const users = readDb(USERS_DB_PATH, []);
@@ -14,13 +15,19 @@ export const createUser = async (req, res) => {
     if (!username || !password) {
         return res.status(400).json({ message: 'server.username_password_required' });
     }
+    if (!isStrongEnoughPassword(password)) {
+        return res.status(400).json({ message: 'server.password_requirements' });
+    }
+    if (role !== undefined && !['admin', 'user'].includes(role)) {
+        return res.status(400).json({ message: 'server.invalid_action' });
+    }
     const users = readDb(USERS_DB_PATH, []);
     if (users.some(u => u.username === username)) {
         return res.status(409).json({ message: 'server.username_already_exists' });
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const newUser = { id: uuidv4(), username, passwordHash, role: role || 'user' };
+    const newUser = { id: uuidv4(), username, passwordHash, role: role || 'user', sessionVersion: 0 };
     users.push(newUser);
     writeDb(USERS_DB_PATH, users);
     req.app.get('userEvents').emit('userAdded');
@@ -41,8 +48,15 @@ export const updateUser = async (req, res) => {
 
     const updatedUser = { ...users[userIndex] };
     if (username) updatedUser.username = username;
-    if (password) updatedUser.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    if (role) updatedUser.role = role;
+    if (password) {
+        if (!isStrongEnoughPassword(password)) return res.status(400).json({ message: 'server.password_requirements' });
+        updatedUser.passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+        updatedUser.sessionVersion = (updatedUser.sessionVersion || 0) + 1;
+    }
+    if (role) {
+        if (!['admin', 'user'].includes(role)) return res.status(400).json({ message: 'server.invalid_action' });
+        updatedUser.role = role;
+    }
 
     users[userIndex] = updatedUser;
     writeDb(USERS_DB_PATH, users);
@@ -53,6 +67,7 @@ export const updateUserPassword = async (req, res) => {
     const { id } = req.params;
     const { oldPassword, newPassword } = req.body;
     if (!newPassword) return res.status(400).json({ message: 'server.new_password_required' });
+    if (!isStrongEnoughPassword(newPassword)) return res.status(400).json({ message: 'server.password_requirements' });
 
     let users = readDb(USERS_DB_PATH, []);
     const userIndex = users.findIndex(u => u.id === id);
@@ -68,6 +83,7 @@ export const updateUserPassword = async (req, res) => {
     }
 
     targetUser.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    targetUser.sessionVersion = (targetUser.sessionVersion || 0) + 1;
     writeDb(USERS_DB_PATH, users);
     res.json({ message: 'server.password_updated_successfully' });
 };

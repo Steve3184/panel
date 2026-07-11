@@ -1,18 +1,16 @@
 <template>
-  <div id="app-container" :class="{ 'has-background': uiStore.panelBackground !== '' }" :style="backgroundStyle">
+  <div id="app-container" :class="{ 'has-background': uiStore.panelBackground !== '' }">
     <RouterView v-slot="{ Component }">
       <component :is="Component" />
     </RouterView>
     <ToastContainer />
     <ChangePasswordModal v-if="uiStore.modals.changePassword" :user="uiStore.selectedUserForPasswordChange" />
-    <PanelSettingsModal v-if="uiStore.modals.panelSettings" :isVisible="uiStore.modals.panelSettings"
-      :initialSettings="uiStore.panelSettings" @update:isVisible="uiStore.modals.panelSettings = $event"
-      @save="handleSavePanelSettings" />
+    <PanelSettingsModal v-if="uiStore.modals.panelSettings" />
   </div>
 </template>
 
 <script setup>
-import { onMounted, watch, computed } from 'vue';
+import { onMounted, watch } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
 import { useWebSocketStore } from './stores/websocket';
 import { useSessionStore } from './stores/session';
@@ -32,28 +30,13 @@ const instancesStore = useInstancesStore(); // 初始化 instances store
 const route = useRoute(); // 初始化 route
 const { t, waitTranslationLoad } = useI18n();
 
-const handleSavePanelSettings = async () => {
-  try {
-    await uiStore.fetchPanelSettings(); // Refresh settings in store
-    uiStore.showToast(t('panelSettings.savedSuccess'), 'success');
-  } catch (error) {
-    console.error(t('panelSettings.savedFailed'), error);
-    uiStore.showToast(t('panelSettings.savedFailed') + ': ' + error.message, 'danger');
-  }
-};
-
 // App 启动时，检查会话并初始化 WebSocket
 onMounted(async () => {
   const isAuthenticated = await sessionStore.checkSession();
   if (isAuthenticated) {
     websocketStore.connect();
   }
-  await uiStore.fetchPanelSettings();
-  if (uiStore.panelSettings && uiStore.panelSettings.panelBackground) {
-    uiStore.updatePanelBackground(uiStore.panelSettings.panelBackground);
-  } else {
-    uiStore.updatePanelBackground('');
-  }
+  await uiStore.fetchPublicPanelSettings();
   try {
     const backgroundResponse = await api.getBackgroundImage();
     if (backgroundResponse.ok) {
@@ -62,17 +45,18 @@ onMounted(async () => {
   } catch (error) { }
 });
 
-const backgroundStyle = computed(() => {
-  if (uiStore.panelBackground != '') {
-    return {
-      '--panel-background-image': `url(${uiStore.panelBackground})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      transition: 'background-image 0.5s ease-in-out', // Smooth transition
-    };
-  }
-  return {};
-});
+watch(
+  () => uiStore.panelBackground,
+  (background) => {
+    document.body.classList.toggle('has-panel-background', Boolean(background));
+    if (background) {
+      document.body.style.setProperty('--panel-background-image', `url(${background})`);
+    } else {
+      document.body.style.removeProperty('--panel-background-image');
+    }
+  },
+  { immediate: true }
+);
 
 // 监听路由变化以更新页面标题
 watch(
@@ -136,17 +120,19 @@ watch(
 #app-container {
   min-height: 100vh;
   background-color: var(--bs-body-bg);
-  /* Default background color */
   transition: background-color 0.5s ease-in-out;
-  /* Smooth transition for color */
+}
+
+body.has-panel-background {
+  background-image: var(--panel-background-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 #app-container.has-background {
   background-color: transparent !important;
-  background-image: var(--panel-background-image); /* Use CSS variable for background image */
-  background-size: cover;
-  background-position: center;
-  transition: background-image 0.5s ease-in-out;
 }
 
 .bg-body-tertiary-transparent {

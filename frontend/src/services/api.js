@@ -51,6 +51,7 @@ async function request(url, options = {}) {
 export default {
   // Session & Setup
   checkSession: () => request('/api/session'),
+  getCapabilities: () => request('/api/capabilities'),
   login: (credentials) => request('/api/login', { method: 'POST', body: JSON.stringify(credentials) }),
   logout: () => request('/api/logout', { method: 'POST' }),
   setup: (admin) => request('/api/setup', { method: 'POST', body: JSON.stringify(admin) }),
@@ -69,7 +70,7 @@ export default {
   deleteUser: (userId) => request(`/api/users/${userId}`, { method: 'DELETE' }),
   updateUserPermission: (instanceId, userId, permissions) => request(`/api/instances/${instanceId}/permissions/${userId}`, { method: 'PUT', body: JSON.stringify(permissions) }),
   updateUserRole: (userId, role) => request(`/api/users/${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
-  changePassword: (userId, passwords) => request(`/api/users/${userId}`, { method: 'PUT', body: JSON.stringify(passwords) }),
+  changePassword: (userId, passwords) => request(`/api/users/${userId}/password`, { method: 'PUT', body: JSON.stringify(passwords) }),
   updateUsername: (userId, username) => request(`/api/users/${userId}`, { method: 'PUT', body: JSON.stringify({ username }) }),
 
   // File Manager
@@ -90,6 +91,7 @@ export default {
   getLogContent: (filename) => request(`/api/logs/${filename}`),
 
   // Panel Settings
+  getPublicPanelSettings: () => request('/api/panel-settings/public'),
   getPanelSettings: () => request('/api/panel-settings'),
   updatePanelSettings: (settings) => request('/api/panel-settings', { method: 'POST', body: JSON.stringify(settings) }),
   uploadBackgroundImage: (formData) => request('/api/panel-settings/background', { method: 'POST', body: formData, headers: {} }),

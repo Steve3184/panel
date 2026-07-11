@@ -9,7 +9,7 @@
           <label for="username">{{ $t('setup.username') }}</label>
         </div>
         <div class="form-floating mt-2">
-          <input type="password" class="form-control" id="password" :placeholder="$t('setup.password.placeholder')" v-model="form.password" required>
+          <input type="password" class="form-control" id="password" :placeholder="$t('setup.password.placeholder')" v-model="form.password" minlength="12" maxlength="256" required>
           <label for="password">{{ $t('setup.password') }}</label>
         </div>
         <button class="btn btn-primary w-100 py-2 mt-3" type="submit">{{ $t('setup.create') }}</button>

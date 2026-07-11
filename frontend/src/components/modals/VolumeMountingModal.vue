@@ -1,5 +1,5 @@
 <template>
-  <div class="modal fade" tabindex="-1" ref="modalEle">
+  <div class="modal fade" data-modal-name="volumeMounting" tabindex="-1" ref="modalEle">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">

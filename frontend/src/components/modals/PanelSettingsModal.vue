@@ -1,5 +1,5 @@
 <template>
-  <div class="modal fade" tabindex="-1" ref="panelSettingsModalRef">
+  <div class="modal fade" data-modal-name="panelSettings" tabindex="-1" ref="panelSettingsModalRef">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import api from '../../services/api';
 import { Modal } from 'bootstrap';
 import { useUiStore } from '../../stores/ui';
@@ -87,15 +87,6 @@ import { useI18n } from '../../composables/useI18n';
 
 const uiStore = useUiStore();
 const { t } = useI18n();
-
-const props = defineProps({
-  isVisible: {
-    type: Boolean,
-    default: false
-  }
-});
-
-const emit = defineEmits(['update:isVisible']);
 
 const settings = ref({
   panelName: '',
@@ -130,55 +121,25 @@ watch(() => uiStore.panelSettings, (newSettings) => {
   }
 }, { deep: true, immediate: true });
 
+let modalInstance = null;
+const panelSettingsModalRef = ref(null);
+const handleHidden = () => uiStore.closeModal('panelSettings');
+
 onMounted(async () => {
   modalInstance = new Modal(panelSettingsModalRef.value);
-  panelSettingsModalRef.value.addEventListener('hidden.bs.modal', () => {
-    emit('update:isVisible', false);
-  });
-  // 确保在显示 modal 之前获取最新的面板设置
-  await uiStore.fetchPanelSettings();
-  if (uiStore.panelSettings && uiStore.panelSettings.panelBackground) {
-    uiStore.updatePanelBackground(uiStore.panelSettings.panelBackground);
-  } else {
-    uiStore.updatePanelBackground('');
-  }
-  try {
-    const backgroundResponse = await api.getBackgroundImage();
-    if (backgroundResponse.ok) {
-      uiStore.updatePanelBackground('/api/panel-settings/background');
-    }
-  } catch (error) {
-    // Handle error if necessary
-  }
+  panelSettingsModalRef.value.addEventListener('hidden.bs.modal', handleHidden);
   modalInstance.show();
+  await uiStore.fetchPanelSettings();
 });
 
-let modalInstance = null;
-const panelSettingsModalRef = ref({});
-
-onMounted(() => {
-  modalInstance = new Modal(panelSettingsModalRef.value);
-  panelSettingsModalRef.value.addEventListener('hidden.bs.modal', () => {
-    emit('update:isVisible', false);
-  });
-});
-
-onUnmounted(() => {
-  if (modalInstance) {
-    modalInstance.dispose();
-  }
-});
-
-watch(() => props.isVisible, (newVal) => {
-  if (newVal) {
-    modalInstance.show();
-  } else {
-    modalInstance.hide();
-  }
+onBeforeUnmount(() => {
+  panelSettingsModalRef.value?.removeEventListener('hidden.bs.modal', handleHidden);
+  modalInstance?.dispose();
+  modalInstance = null;
 });
 
 const closeModal = () => {
-  modalInstance.hide();
+  modalInstance?.hide();
 };
 
 const handleLogoUpload = (event) => {
@@ -283,27 +244,15 @@ const saveSettings = async () => {
       await api.uploadBackgroundImage(formData);
       uiStore.showToast(t('panelSettings.backgroundImageUploadSuccess'), 'success');
       settings.value.panelBackgroundFile = null; // 清除文件
+      uiStore.updatePanelBackground(`/api/panel-settings/background?v=${Date.now()}`);
     }
 
     // 保存其他面板设置
     await api.updatePanelSettings(settings.value);
     uiStore.showToast(t('panelSettings.savedSuccess'), 'success');
     
-    // 刷新设置以获取最新的背景图片 URL
+    // 刷新非图片设置；背景图片由独立接口维护。
     await uiStore.fetchPanelSettings();
-    if (uiStore.panelSettings && uiStore.panelSettings.panelBackground) {
-      uiStore.updatePanelBackground(uiStore.panelSettings.panelBackground);
-    } else {
-      uiStore.updatePanelBackground('');
-    }
-    try {
-      const backgroundResponse = await api.getBackgroundImage();
-      if (backgroundResponse.ok) {
-        uiStore.updatePanelBackground('/api/panel-settings/background');
-      }
-    } catch (error) {
-      // Handle error if necessary
-    }
     closeModal();
   } catch (error) {
     console.error(t('panelSettings.savedFailed'), error);
@@ -322,10 +271,6 @@ const restartPanel = async () => {
 </script>
 
 <style scoped>
-.modal.show {
-  background: rgba(0, 0, 0, 0.5);
-}
-
 .logo-preview {
   max-width: 100px;
   max-height: 100px;

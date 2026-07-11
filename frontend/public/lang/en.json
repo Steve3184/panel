@@ -290,6 +290,9 @@
   "instances.restart": "Restart",
   "instances.restart.force": "Force Restart",
   "instances.save": "Save Changes",
+  "instances.sandbox.enabled": "Isolate this Shell instance",
+  "instances.sandbox.disabled.warning": "Sandboxing is disabled. This process can access files and services available to the panel account.",
+  "instances.sandbox.unsupported": "Shell isolation is not supported by this platform or system configuration. The sandbox setting will be ignored.",
   "instances.search.placeholder": "Search instances...",
   "instances.select": "Select instance:",
   "instances.settings": "Instance Settings",
@@ -484,6 +487,9 @@
   "server.name_already_exists": "Name conflicts with an existing file or directory",
   "server.new_container_created_and_started": "New container {containerName} ({id}) has been created and started.",
   "server.new_password_required": "New password is required",
+  "server.password_requirements": "Password must be between 12 and 256 characters",
+  "server.too_many_auth_attempts": "Too many authentication attempts. Try again later",
+  "server.invalid_request_origin": "Request origin is not allowed",
   "server.no_action_perms": "No permission for this action",
   "server.no_field_perms": "No permission for this option",
   "server.no_permission_data_provided": "No permission data provided",
@@ -522,6 +528,8 @@
   "server.upload_id_required": "Upload ID is required",
   "server.upload_initiated": "Upload initiated",
   "server.upload_not_found_or_expired": "Upload not found or has expired",
+  "server.too_many_uploads": "Too many active uploads. Complete or wait for an existing upload to expire",
+  "server.upload_chunk_in_progress": "Another chunk is already being uploaded",
   "server.user_not_found": "User not found",
   "server.username_already_exists": "Username already exists",
   "server.username_password_required": "Username and password are required",
@@ -615,6 +623,5 @@
   "websocket.connection.lost": "Connection to the server has been lost. Reconnecting...",
   "websocket.error": "WebSocket Error:",
   "websocket.established": "Backend WebSocket connection successful",
-  "websocket.lost": "Backend WebSocket connection lost!",
-  "server.too_many_login_attempts": "Too many login attempts. Please try again later."
+  "websocket.lost": "Backend WebSocket connection lost!"
 }

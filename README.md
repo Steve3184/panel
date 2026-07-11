@@ -61,6 +61,7 @@ A desktop-class file manager directly in your browser.
 *   **Unzip**: For extracting releases
 *   **Docker**: (Optional) For container management
 *   **7-Zip**: (Optional) For advanced archiving features
+*   **Bubblewrap**: Included in Linux release archives; install it separately when running from source
 
 **Note**: Node.js is **NOT** required when using pre-built releases, as they include all dependencies.
 
@@ -80,6 +81,10 @@ sudo wget https://github.com/Steve3184/panel/releases/download/latest/release-li
 sudo unzip release-linux-x64.zip && sudo rm release-linux-x64.zip
 
 # 3. Setup Systemd Service
+sudo useradd --system --home-dir /opt/panel --shell /usr/sbin/nologin panel 2>/dev/null || true
+sudo chown -R panel:panel /opt/panel
+# Optional, required only when using Docker instances:
+sudo usermod -aG docker panel
 sudo wget -O /etc/systemd/system/panel.service https://raw.githubusercontent.com/Steve3184/panel/main/panel.service
 sudo systemctl daemon-reload
 sudo systemctl enable panel
@@ -110,7 +115,7 @@ sudo unzip release-linux-arm64.zip && sudo rm release-linux-arm64.zip
 1.  **Install Node.js 22:**
     ```bash
     curl -sL https://deb.nodesource.com/setup_22.x | bash -
-    sudo apt install -y nodejs
+    sudo apt install -y nodejs bubblewrap
     ```
 
 2.  **Clone Repository:**
@@ -129,6 +134,10 @@ sudo unzip release-linux-arm64.zip && sudo rm release-linux-arm64.zip
 
 4.  **Configure Service:**
     ```bash
+    sudo useradd --system --home-dir /opt/panel --shell /usr/sbin/nologin panel 2>/dev/null || true
+    sudo chown -R panel:panel /opt/panel
+    # Optional, required only when using Docker instances:
+    sudo usermod -aG docker panel
     sudo cp panel.service /etc/systemd/system/
     # Edit service file if path differs from /opt/panel
     sudo systemctl daemon-reload
@@ -150,20 +159,27 @@ You can configure the panel via environment variables or by modifying `src/serve
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `SESSION_SECRET` | Key used to sign the session ID cookie. **Change this in production.** | |
+| `SESSION_SECRET` | Optional session signing and encryption key (minimum 32 bytes). If unset, a persistent random key is generated in the data directory. | Generated |
 | `PORT` | The port the server listens on. | `3000` |
 | `PANEL_LANG` | Server-side language (e.g., `jp`, `en`, `zh_CN`). | `en` |
+| `PANEL_DATA_DIR` | Optional directory for databases, sessions, workspaces, and temporary uploads. | Project directory |
+| `TRUST_PROXY_HOPS` | Number of trusted reverse proxies in front of the panel. Leave unset for direct access. | `0` |
+| `BWRAP_BIN` | Optional absolute path to the Bubblewrap executable. If unset, Panel checks the bundled binary and common system paths. | Auto-detected |
 
 **Setting variables in `panel.service`:**
 Edit `/etc/systemd/system/panel.service` and add `Environment` lines under `[Service]`:
 
 ```ini
 [Service]
-Environment="SESSION_SECRET=MySuperSecretKey123"
+Environment="SESSION_SECRET=replace-with-at-least-32-random-bytes"
 Environment="PORT=8080"
 ExecStart=/usr/bin/node src/server.js
 ```
 *Remember to run `sudo systemctl daemon-reload && sudo systemctl restart panel` after changes.*
+
+Shell instances are sandboxed by default. Linux releases include a statically linked Bubblewrap binary, while source installations can use `BWRAP_BIN` or a system Bubblewrap installation. At startup, Panel executes a real sandbox capability probe. If the platform or kernel does not support the sandbox, the UI hides the switch, displays a security warning, and starts Shell instances without isolation regardless of their saved sandbox setting. Windows does not support Bubblewrap and therefore runs native Shell instances without this isolation; use Docker for untrusted Windows workloads.
+
+When available, the sandbox exposes the instance working directory as `/workspace`, provides read-only system libraries, and hides panel databases, sessions, the Docker socket, and other host paths. Administrators can disable isolation per instance, but doing so gives the process the same filesystem and service access as the `panel` system account.
 
 ### 🌍 Remote Access (Gradio Tunnel)
 The panel includes built-in tunneling capabilities using Gradio, allowing you to access your panel from the public internet without configuring router port forwarding or setting up FRP.
