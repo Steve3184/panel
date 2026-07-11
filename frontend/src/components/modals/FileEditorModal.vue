@@ -320,6 +320,7 @@ const close = () => uiStore.closeModal('fileEditor');
 <style scoped>
 .modal-fullscreen .modal-body {
   height: calc(100vh - 110px);
+  height: calc(100dvh - 110px);
 }
 :deep(.cm-editor) {
   height: 100%;

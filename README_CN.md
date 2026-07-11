@@ -181,6 +181,27 @@ Shell 实例默认启用沙箱。Linux 发布包内置静态链接的 Bubblewrap
 
 沙箱可用时会将实例工作目录映射为 `/workspace`，仅提供只读系统运行库，并隐藏面板数据库、会话、Docker socket 和其他主机路径。管理员可以按实例关闭隔离，但关闭后进程将拥有与 `panel` 系统账户相同的文件和服务访问能力。
 
+### 🔀 反向代理与自定义域名
+
+面板支持通过反向代理（nginx、Caddy、FRP 等）配合自定义域名访问。所需配置取决于 HTTPS 是否由代理终止。
+
+**HTTP 代理——无需额外配置**
+
+包括 nginx HTTP 模式、Caddy 不启用 TLS，以及 FRP vhost HTTP 模式。代理会原样转发 `Host` 和 `Origin` 头，面板的来源校验可以直接通过。
+
+**HTTPS 终止代理——需设置 `TRUST_PROXY_HOPS=1`**
+
+包括 nginx/Caddy 负责 TLS 证书，以及 FRP HTTPS vhost 模式。代理剥离 TLS 后以明文 HTTP 向内转发请求，Express 无法自行感知原始的 `https` 协议。不设置此项时，面板的来源校验会检测到协议不匹配并返回 403。
+
+在 `panel.service` 中添加：
+```ini
+Environment="TRUST_PROXY_HOPS=1"
+```
+
+您的代理还需要转发 `X-Forwarded-Proto: https` 头——大多数 nginx 和 Caddy 的默认配置已包含此项。
+
+> ⚠️ 如果面板直接暴露在公网、前面没有代理，请**不要**设置 `TRUST_PROXY_HOPS`，否则任何客户端都可以伪造协议头。
+
 ### 🌍 远程访问 (Gradio 隧道)
 面板内置了基于 Gradio 的隧道功能，无需配置路由器端口转发或搭建 FRP，即可在公网访问您的面板。
 

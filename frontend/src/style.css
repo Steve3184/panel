@@ -8,6 +8,7 @@ body {
 
 body {
     min-height: 100vh;
+    min-height: 100dvh;
 }
 
 .form-signin {
@@ -30,6 +31,7 @@ body {
     flex-direction: column;
     /* Stack sidebar content vertically */
     height: 100vh; /* Make sidebar take full viewport height */
+    height: 100dvh; /* Make sidebar take full viewport height */
     overflow-y: auto; /* Enable scrolling for the entire sidebar */
 }
 
@@ -97,6 +99,7 @@ body {
     gap: 1rem;
     /* Spacing between cards */
     max-height: calc(100vh - 300px);
+    max-height: calc(100dvh - 300px);
 }
 
 /* Adjust card width for larger screens */
@@ -129,6 +132,7 @@ body {
 
     #instance-list-overview {
         max-height: calc(100vh - 420px);
+        max-height: calc(100dvh - 420px);
     }
 }
 
@@ -171,6 +175,7 @@ body {
 #terminal-container {
     width: 100%;
     height: calc(100vh - 155px);
+    height: calc(100dvh - 155px);
     background-color: var(--bs-body-bg); /* Use theme background */
     padding: 5px 10px;
     border-radius: 5px;
@@ -201,6 +206,7 @@ body {
         width: 100vw;
         max-width: none;
         height: 100vh;
+        height: 100dvh;
         margin: 0;
     }
 
@@ -227,6 +233,7 @@ body {
 
 #editor-container {
     height: calc(-180px + 100vh) !important;
+    height: calc(-180px + 100dvh) !important;
 }
 
 /* New styles for port and volume modals */
@@ -258,6 +265,7 @@ body {
 
 #file-browser {
     height: calc(100vh - 180px);
+    height: calc(100dvh - 180px);
     overflow-y: scroll;
 }
 

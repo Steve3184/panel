@@ -4,7 +4,7 @@
     <main id="main-content">
       <AppHeader :page-title="t('title.logs')" />
       
-      <div class="container-fluid py-3 flex-grow-1 d-flex flex-column" style="height: calc(100vh - 100px);">
+      <div class="container-fluid py-3 flex-grow-1 d-flex flex-column" style="height: calc(100vh - 100px); height: calc(100dvh - 100px);">
         <!-- Header Row -->
         <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
           <div class="bg-body-tertiary rounded px-3 py-2">

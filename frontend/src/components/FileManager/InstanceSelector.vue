@@ -77,6 +77,7 @@ const copyWebDAVLink = async (instanceId) => {
 <style scoped>
 #instance-selector {
     height: calc(100vh - 100px);
+    height: calc(100dvh - 100px);
     overflow-y: auto;
 }
 </style>

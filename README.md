@@ -181,6 +181,27 @@ Shell instances are sandboxed by default. Linux releases include a statically li
 
 When available, the sandbox exposes the instance working directory as `/workspace`, provides read-only system libraries, and hides panel databases, sessions, the Docker socket, and other host paths. Administrators can disable isolation per instance, but doing so gives the process the same filesystem and service access as the `panel` system account.
 
+### 🔀 Reverse Proxy & Custom Domain
+
+The panel works behind a reverse proxy (nginx, Caddy, FRP, etc.) with a custom domain. The required configuration depends on whether TLS is terminated by the proxy.
+
+**HTTP proxy — no extra configuration needed**
+
+This includes nginx in HTTP mode, Caddy without TLS, and FRP vhost HTTP mode. The proxy forwards the `Host` and `Origin` headers unchanged, so the panel's built-in origin check passes automatically.
+
+**HTTPS-terminating proxy — set `TRUST_PROXY_HOPS=1`**
+
+This includes nginx/Caddy handling TLS certificates and FRP HTTPS vhost mode. When the proxy strips TLS and forwards plain HTTP inward, Express cannot detect the original `https` protocol on its own. Without this setting the panel's origin check sees a protocol mismatch and returns 403.
+
+Add to your `panel.service`:
+```ini
+Environment="TRUST_PROXY_HOPS=1"
+```
+
+Your proxy must also forward the `X-Forwarded-Proto: https` header — this is the default for most nginx and Caddy configurations.
+
+> ⚠️ Do **not** set `TRUST_PROXY_HOPS` when the panel is directly internet-accessible without a proxy in front. Setting it in that case lets any client spoof the protocol header.
+
 ### 🌍 Remote Access (Gradio Tunnel)
 The panel includes built-in tunneling capabilities using Gradio, allowing you to access your panel from the public internet without configuring router port forwarding or setting up FRP.
 

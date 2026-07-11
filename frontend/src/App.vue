@@ -119,6 +119,7 @@ watch(
 <style>
 #app-container {
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bs-body-bg);
   transition: background-color 0.5s ease-in-out;
 }

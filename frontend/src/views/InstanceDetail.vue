@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useInstancesStore } from '../stores/instances';
 import { useSessionStore } from '../stores/session';
@@ -150,6 +150,8 @@ const switchContainer = () => {
     nextTick(() => terminalRef.value?.triggerResize());
 };
 
+let vpCleanup = null;
+
 onMounted(() => {
     // If instances are not loaded yet, fetch them
     if (instancesStore.instances.length === 0) {
@@ -158,6 +160,33 @@ onMounted(() => {
     if (instance.value?.type === 'docker_compose' && instance.value?.status === 'running') {
         fetchComposeContainers();
     }
+
+    // Mobile keyboard avoidance: shrink #terminal-container to the visible area
+    // when the software keyboard appears, so the xterm cursor line stays visible.
+    // We handle this here (not inside Terminal.vue) because we own the container element.
+    if (window.visualViewport) {
+        const container = document.getElementById('terminal-container');
+        const onVpResize = () => {
+            if (!container) return;
+            const keyboardHeight = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+            if (keyboardHeight > 50) {
+                // Keyboard is open: shrink the container to the visible area below the header
+                const top = container.getBoundingClientRect().top;
+                const available = window.visualViewport.height - top;
+                container.style.height = Math.max(80, available) + 'px';
+            } else {
+                // Keyboard is closed: clear inline height, let flex: 1 take over
+                container.style.height = '';
+            }
+            nextTick(() => terminalRef.value?.triggerResize());
+        };
+        window.visualViewport.addEventListener('resize', onVpResize);
+        vpCleanup = () => window.visualViewport.removeEventListener('resize', onVpResize);
+    }
+});
+
+onBeforeUnmount(() => {
+    vpCleanup?.();
 });
 
 // Watch for route changes if the user navigates between instances
@@ -198,9 +227,10 @@ function openSettings() {
 <style scoped>
 #terminal-container {
     width: 100%;
-    height: calc(100vh - 155px);
+    flex: 1;
+    min-height: 0; /* prevents flex child from overflowing its container */
     background-color: #000;
-    padding:  5px 10px;
+    padding: 5px 10px;
     border-radius: 5px;
     overflow: hidden;
     position: relative;
