@@ -7,7 +7,13 @@ export default defineConfig({
   plugins: [
     vue(),
     monacoEditorPlugin({
-      languageWorkers: ['editorWorkerService', 'json', 'html'], 
+      // esbuild 0.28 no longer resolves these package-export paths without .js.
+      languageWorkers: [],
+      customWorkers: [
+        { label: 'editorWorkerService', entry: 'monaco-editor/esm/vs/editor/editor.worker.js' },
+        { label: 'json', entry: 'monaco-editor/esm/vs/language/json/json.worker.js' },
+        { label: 'html', entry: 'monaco-editor/esm/vs/language/html/html.worker.js' },
+      ],
     })
   ],
   server: {
