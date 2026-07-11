@@ -10,8 +10,12 @@ import { truncateTerminalOutput } from '../core/terminalSecurity.js';
 
 const clients = new Set(); // 所有连接的 WebSocket 客户端
 const editingFileClients = new Set(); // 正在进行文件编辑的 WebSocket 客户端
-// K: filePath, V: { instanceId, absolutePath, wsClient }
+// K: `${instanceId}:${filePath}`, V: { instanceId, filePath, absolutePath, wsClient }
 const editingFiles = new Map(); // 存储正在编辑的文件及其关联的 WebSocket 客户端
+
+// Per-user WebSocket connection counter for rate limiting.
+const MAX_WS_PER_USER = 8;
+const wsConnectionsPerUser = new Map(); // K: userId, V: count
 
 function refreshWebSocketUser(ws) {
     const user = readDb(USERS_DB_PATH, []).find(item => item.id === ws.user?.id);
@@ -145,7 +149,7 @@ async function handleMessage(ws, messageData) {
                     }
                     const absolutePath = await getFileAbsolutePath(instanceId, filePath);
 
-                    editingFiles.set(filePath, { instanceId, absolutePath, wsClient: ws });
+                    editingFiles.set(`${instanceId}:${filePath}`, { instanceId, filePath, absolutePath, wsClient: ws });
                     editingFileClients.add(ws); // 将此客户端加入到文件编辑客户端集合
 
                     const content = await fs.readFile(absolutePath, 'utf8');
@@ -208,6 +212,15 @@ export function setupWebSocket(app, sessionParser) {
             if (!req.session.user) {
                 return ws.close();
             }
+
+            const userId = req.session.user.id;
+            const currentCount = wsConnectionsPerUser.get(userId) || 0;
+            if (currentCount >= MAX_WS_PER_USER) {
+                ws.close(1008, 'Too many connections');
+                return;
+            }
+            wsConnectionsPerUser.set(userId, currentCount + 1);
+
             ws.user = req.session.user;
             clients.add(ws);
 
@@ -222,6 +235,13 @@ export function setupWebSocket(app, sessionParser) {
                     if (value.wsClient === ws) {
                         editingFiles.delete(key);
                     }
+                }
+                // 释放连接计数
+                const uid = ws.user?.id;
+                if (uid) {
+                    const n = (wsConnectionsPerUser.get(uid) || 1) - 1;
+                    if (n <= 0) wsConnectionsPerUser.delete(uid);
+                    else wsConnectionsPerUser.set(uid, n);
                 }
             });
         });

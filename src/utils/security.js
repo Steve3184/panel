@@ -42,9 +42,21 @@ export async function hardenDataPermissions(directories) {
     }
 }
 
+// Safe HTTP methods that carry no state-changing side effects.
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 export function isRequestOriginAllowed(req) {
     const origin = req.headers.origin;
-    if (!origin) return true;
+
+    // For safe (read-only) methods an absent Origin is fine — browsers omit it
+    // on same-origin navigations and many legitimate GET requests.
+    // For state-changing methods (POST / PUT / DELETE / PATCH) we require the
+    // Origin header so that HTML-form CSRF attacks without an Origin cannot
+    // reach the API.
+    if (!origin) {
+        return SAFE_METHODS.has(req.method.toUpperCase());
+    }
+
     try {
         const originUrl = new URL(origin);
         return originUrl.host === req.get('host') && originUrl.protocol === `${req.protocol}:`;

@@ -70,7 +70,7 @@ export async function startInstance(instanceConfig) {
             (dockerConfig.ports || []).forEach(p => {
                 const [hostPort, containerPortInfo] = p.split(':');
                 const [containerPort, containerProtocol] = containerPortInfo.split('/')
-                portBindings[`${containerPort || hostPort}/${containerProtocol ? 'udp' : 'tcp'}`] = [{ HostIP: '0.0.0.0', HostPort: hostPort || '' }];
+                portBindings[`${containerPort || hostPort}/${containerProtocol ? 'udp' : 'tcp'}`] = [{ HostIP: '127.0.0.1', HostPort: hostPort || '' }];
                 exposedPorts[`${containerPort || hostPort}/${containerProtocol ? 'udp' : 'tcp'}`] = {};
             });
 
@@ -291,6 +291,10 @@ export async function startInstance(instanceConfig) {
             // --- 自动重启逻辑 ---
             // 只有在不是用户主动停止，并且设置了 autoRestart 选项时才尝试自动重启
             if ((!session.isUserTriggeredStop && currentInstance.autoRestart) || session.isUserTriggeredRestart) {
+                // User-triggered restarts should not accumulate delay — reset the counter first.
+                if (session.isUserTriggeredRestart) {
+                    session.restartAttempts = 0;
+                }
                 session.restartAttempts++;
                 const delay = Math.min(session.restartAttempts * 1000, 30000); // 最长 30 秒延迟
                 console.log(i18n.t('server.instance_will_restart_in_seconds', { name: instanceConfig.name, id: instanceConfig.id, delay: delay / 1000, attempts: session.restartAttempts }));

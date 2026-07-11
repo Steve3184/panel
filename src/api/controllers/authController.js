@@ -5,7 +5,11 @@ import { USERS_DB_PATH, SALT_ROUNDS } from '../../config.js';
 import { isStrongEnoughPassword } from '../../utils/security.js';
 import { getShellSandboxCapability } from '../../core/sandboxCapability.js';
 
-export const setupAdmin = (req, res) => {
+// Dummy hash used to equalise response time when the username is not found,
+// preventing timing-based username enumeration.
+const DUMMY_HASH = await bcrypt.hash('dummy-constant-value', SALT_ROUNDS);
+
+export const setupAdmin = async (req, res) => {
     const users = readDb(USERS_DB_PATH, []);
     if (users.length > 0) {
         return res.status(403).json({ message: 'server.setup_already_completed' });
@@ -17,7 +21,7 @@ export const setupAdmin = (req, res) => {
     if (!isStrongEnoughPassword(password)) {
         return res.status(400).json({ message: 'server.password_requirements' });
     }
-    const passwordHash = bcrypt.hashSync(password, SALT_ROUNDS);
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     const adminUser = { id: uuidv4(), username, passwordHash, role: 'admin', sessionVersion: 0 };
     writeDb(USERS_DB_PATH, [adminUser]);
     req.app.get('userEvents')?.emit('userAdded');
@@ -28,7 +32,11 @@ export const login = async (req, res) => {
     const { username, password } = req.body;
     const users = readDb(USERS_DB_PATH, []);
     const user = users.find(u => u.username === username);
-    if (!user || typeof password !== 'string' || !await bcrypt.compare(password, user.passwordHash)) {
+    // Always call bcrypt.compare to equalise response time regardless of whether
+    // the username exists, preventing timing-based username enumeration.
+    const hashToCompare = user ? user.passwordHash : DUMMY_HASH;
+    const passwordMatch = typeof password === 'string' && await bcrypt.compare(password, hashToCompare);
+    if (!user || !passwordMatch) {
         return res.status(401).json({ message: 'server.invalid_credentials' });
     }
 

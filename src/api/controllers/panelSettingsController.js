@@ -26,7 +26,18 @@ function detectImageMime(buffer) {
 async function loadSettings() {
   try {
     const data = await fs.readFile(SETTINGS_FILE, 'utf8');
-    panelSettings = { ...panelSettings, ...JSON.parse(data) };
+    const loaded = JSON.parse(data);
+    panelSettings = {
+      ...panelSettings,
+      ...loaded,
+      // Deep-merge gradioTunnel so a missing or non-object value never loses the sub-structure
+      gradioTunnel: {
+        ...panelSettings.gradioTunnel,
+        ...(loaded.gradioTunnel && typeof loaded.gradioTunnel === 'object'
+          ? loaded.gradioTunnel
+          : {})
+      }
+    };
   } catch (error) {
     if (error.code === 'ENOENT') {
       await saveSettings();
@@ -80,10 +91,31 @@ export const updatePanelSettings = async (req, res) => {
 
   const { panelName, panelLogo, gradioTunnel, panelPort } = req.body;
 
-  if (panelName !== undefined) panelSettings.panelName = panelName;
-  if (panelLogo !== undefined) panelSettings.panelLogo = panelLogo;
+  if (panelName !== undefined) {
+    if (typeof panelName !== 'string' || panelName.length > 128) {
+      return res.status(400).json({ message: 'server.invalid_action' });
+    }
+    panelSettings.panelName = panelName;
+  }
+  if (panelLogo !== undefined) {
+    if (panelLogo !== '' && typeof panelLogo === 'string') {
+      // Only allow same-origin relative paths or data:image/... URIs
+      const isDataImage = panelLogo.startsWith('data:image/');
+      const isRelative = panelLogo.startsWith('/');
+      if (!isDataImage && !isRelative) {
+        return res.status(400).json({ message: 'server.invalid_action' });
+      }
+    }
+    panelSettings.panelLogo = panelLogo;
+  }
   if (gradioTunnel !== undefined) panelSettings.gradioTunnel = gradioTunnel;
-  if (panelPort !== undefined) panelSettings.panelPort = panelPort;
+  if (panelPort !== undefined) {
+    const port = Number.parseInt(panelPort, 10);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      return res.status(400).json({ message: 'server.invalid_port' });
+    }
+    panelSettings.panelPort = port;
+  }
 
   await saveSettings();
 
@@ -115,11 +147,18 @@ export const uploadBackgroundImage = async (req, res) => {
   let fileBuffer = Buffer.from('');
   let fileSize = 0;
   const MAX_SIZE = 4 * 1024 * 1024; // 4MB
+  let responseSent = false;
+
+  const sendOnce = (status, body) => {
+    if (responseSent) return;
+    responseSent = true;
+    res.status(status).json(body);
+  };
 
   busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
     if (fieldname !== 'backgroundImage') {
       file.resume();
-      return res.status(400).json({ message: 'server.invalid_action' });
+      return sendOnce(400, { message: 'server.invalid_action' });
     }
 
     file.on('data', (data) => {
@@ -128,31 +167,29 @@ export const uploadBackgroundImage = async (req, res) => {
       if (fileSize > MAX_SIZE) {
         req.unpipe(busboy); // Stop receiving data
         file.destroy(); // Destroy the file stream
-        return res.status(413).json({ message: 'server.file_size_exceeds_limit' });
+        sendOnce(413, { message: 'server.file_size_exceeds_limit' });
       }
     });
 
     file.on('end', async () => {
-      if (fileSize > MAX_SIZE) {
-        return; // Response already sent
-      }
+      if (responseSent) return;
       try {
         if (!detectImageMime(fileBuffer)) {
-          return res.status(400).json({ message: 'server.invalid_file_details' });
+          return sendOnce(400, { message: 'server.invalid_file_details' });
         }
         await fs.writeFile(BGIMAGE_PATH, fileBuffer, { mode: 0o600 });
         await fs.chmod(BGIMAGE_PATH, 0o600);
-        res.status(200).json({ message: 'server.ok' });
+        sendOnce(200, { message: 'server.ok' });
       } catch (error) {
         console.error('Error saving background image:', error);
-        res.status(500).json({ message: 'server.internal_server_error' });
+        sendOnce(500, { message: 'server.internal_server_error' });
       }
     });
   });
 
   busboy.on('error', (err) => {
     console.error('Busboy error:', err);
-    res.status(500).json({ message: 'server.file_upload_chunk_failed_parsing', error: err.message });
+    sendOnce(500, { message: 'server.file_upload_chunk_failed_parsing', error: err.message });
   });
 
   req.pipe(busboy);

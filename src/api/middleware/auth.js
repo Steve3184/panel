@@ -55,7 +55,10 @@ export const isAuthenticated = (req, res, next) => {
  * 管理员权限检查中间件。
  */
 export const isAdmin = (req, res, next) => {
-    if (req.session.user && req.session.user.role === 'admin') {
+    if (!req.session.user) {
+        return res.status(401).json({ message: 'server.unauthorized' });
+    }
+    if (req.session.user.role === 'admin') {
         next();
     } else {
         res.status(403).json({ message: 'server.admin_access_required' });

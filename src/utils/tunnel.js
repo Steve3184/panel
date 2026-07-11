@@ -23,6 +23,13 @@ const TUNNEL_TIMEOUT_SECONDS = 30;
 const TUNNEL_ERROR_MESSAGE = "tunnel error: ";
 const GRADIO_API_SERVER = "https://api.gradio.app/v2/tunnel-request";
 
+// Register process signal handlers once at module level so they don't
+// accumulate each time a tunnel is (re)started.
+const _activeTunnels = new Set();
+process.on('exit', () => { _activeTunnels.forEach(t => t.kill()); });
+process.on('SIGINT', () => process.exit());
+process.on('SIGTERM', () => process.exit());
+
 class Tunnel {
     constructor(remote_host, remote_port, local_host, local_port, share_token) {
         this.proc = null;
@@ -69,6 +76,7 @@ class Tunnel {
             this.proc.kill();
             this.proc = null;
         }
+        _activeTunnels.delete(this);
     }
 
     async restartTunnel() {
@@ -97,10 +105,7 @@ class Tunnel {
             }
 
             this.proc = spawn(binary, command);
-
-            process.on('exit', () => this.kill());
-            process.on('SIGINT', () => process.exit());
-            process.on('SIGTERM', () => process.exit());
+            _activeTunnels.add(this);
 
             const log = [];
             let url = "";
@@ -147,7 +152,9 @@ class Tunnel {
     }
 }
 
-async function setupTunnel(local_host, local_port, share_token) {
+const MAX_SETUP_RETRIES = 5;
+
+async function setupTunnel(local_host, local_port, share_token, _attempt = 0) {
     try {
         const response = await fetch(GRADIO_API_SERVER);
         if (!response.ok) {
@@ -167,7 +174,13 @@ async function setupTunnel(local_host, local_port, share_token) {
 
         return tunnel;
     } catch (e) {
-        setTimeout(() => {setupTunnel(local_host, local_port, share_token)}, 15 * 1000);
+        if (_attempt >= MAX_SETUP_RETRIES) {
+            console.error(`Tunnel setup failed after ${MAX_SETUP_RETRIES} attempts, giving up:`, e.message);
+            return null;
+        }
+        const delay = Math.min(15000 * Math.pow(2, _attempt), 5 * 60 * 1000); // exponential back-off, max 5 min
+        console.error(`Tunnel setup attempt ${_attempt + 1} failed: ${e.message}. Retrying in ${delay / 1000}s...`);
+        return new Promise(resolve => setTimeout(() => resolve(setupTunnel(local_host, local_port, share_token, _attempt + 1)), delay));
     }
 }
 

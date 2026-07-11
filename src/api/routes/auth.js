@@ -16,7 +16,7 @@ const authLimiter = rateLimit({
 // --- 公共路由 ---
 router.post('/setup', authLimiter, authController.setupAdmin);
 router.post('/login', authLimiter, authController.login);
-router.get('/users/check', authController.checkAdminExists); // 用于前端设置页面
+router.get('/users/check', authLimiter, authController.checkAdminExists); // 用于前端设置页面
 router.get('/capabilities', authController.getCapabilities);
 
 // --- 受保护的路由 ---

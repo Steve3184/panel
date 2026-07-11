@@ -39,7 +39,29 @@ const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
 if (Number.isInteger(trustProxyHops) && trustProxyHops > 0) app.set('trust proxy', trustProxyHops);
 
 // --- 配置中间件 ---
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            // Monaco Editor requires eval() for its worker compilation
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            // Bootstrap and Monaco inject inline styles
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            // data: for base64 logos/backgrounds, blob: for Monaco worker URLs
+            imgSrc: ["'self'", "data:", "blob:"],
+            // WebSocket connections back to this same server
+            connectSrc: ["'self'", "ws:", "wss:"],
+            fontSrc: ["'self'", "data:"],
+            // Monaco workers are loaded as blob: URLs
+            workerSrc: ["'self'", "blob:"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            // Prevent the panel from being embedded in iframes on other origins
+            frameAncestors: ["'none'"],
+        },
+    },
+    crossOriginEmbedderPolicy: false,
+}));
 app.use(express.json({ limit: '1mb' }));
 
 const FileStore = FileStoreFactory(session);
@@ -63,7 +85,7 @@ const sessionParser = session({
     cookie: {
         secure: 'auto',
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'strict',
         maxAge: 24 * 60 * 60 * 1000
     }
 })
@@ -84,6 +106,9 @@ let userCount = readDb(USERS_DB_PATH, []).length;
 const userEvents = new EventEmitter();
 userEvents.on('userAdded', () => {
     userCount++;
+});
+userEvents.on('userRemoved', () => {
+    userCount = Math.max(0, userCount - 1);
 });
 
 app.set('userEvents', userEvents);

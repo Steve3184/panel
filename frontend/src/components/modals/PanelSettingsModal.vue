@@ -105,6 +105,13 @@ watch(() => uiStore.panelSettings, (newSettings) => {
   if (newSettings) {
     settings.value = {
       ...newSettings,
+      gradioTunnel: {
+        enabled: false,
+        shareToken: '',
+        ...(newSettings.gradioTunnel && typeof newSettings.gradioTunnel === 'object'
+          ? newSettings.gradioTunnel
+          : {})
+      }
     };
   } else {
     // Reset to default if panelSettings becomes null (e.g., on error)

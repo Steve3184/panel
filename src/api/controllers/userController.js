@@ -93,7 +93,7 @@ export const deleteUser = (req, res) => {
     if (id === req.session.user.id) {
         return res.status(403).json({ message: 'server.cannot_delete_admin_account' });
     }
-    
+
     let users = readDb(USERS_DB_PATH, []);
     const initialLength = users.length;
     users = users.filter(u => u.id !== id);
@@ -110,6 +110,8 @@ export const deleteUser = (req, res) => {
         }
     });
     writeDb(INSTANCES_DB_PATH, instances);
+
+    req.app.get('userEvents')?.emit('userRemoved');
 
     res.status(204).send();
 };
