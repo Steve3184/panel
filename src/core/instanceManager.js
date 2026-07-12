@@ -359,9 +359,6 @@ export async function startInstance(instanceConfig) {
             instanceConfig.sandboxAllowedPaths,
             instanceConfig.sandboxPreserveWorkspacePath === true
         );
-        if (instanceConfig.sandboxEnabled !== false && !launch.sandboxed) {
-            console.warn(`Shell sandbox unavailable for instance ${instanceConfig.id}: ${launch.sandboxReason || 'disabled'}`);
-        }
         const ptyOptions = {
             name: 'xterm-color', cols: 80, rows: 30, cwd: instanceCwd,
             env: launch.env

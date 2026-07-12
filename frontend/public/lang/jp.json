@@ -296,7 +296,7 @@
   "instances.sandbox.disabled.warning": "サンドボックスが無効です。このプロセスはパネルのシステムアカウントがアクセスできるファイルとサービスにアクセスできます。",
   "instances.sandbox.enabled": "この Shell インスタンスを分離する",
   "instances.sandbox.preserve_workspace_path": "サンドボックス内でワークスペースの元のパスを維持する",
-  "instances.sandbox.unsupported": "このプラットフォームまたはシステム構成では Shell 分離を利用できません。起動時にサンドボックス設定は無視されます。",
+  "instances.sandbox.unsupported": "Shell 分離を利用できません。Linux では、サンドボックスを必要とする Shell インスタンスは起動しません。",
   "instances.save": "変更を保存",
   "instances.search.placeholder": "インスタンスを検索...",
   "instances.select": "インスタンスを選択：",

@@ -27,6 +27,9 @@ export function buildBubblewrapArguments(workspace, command, shell = '/bin/bash'
     return [
         '--die-with-parent',
         '--new-session',
+        '--unshare-user',
+        '--disable-userns',
+        '--assert-userns-disabled',
         '--unshare-all',
         '--share-net',
         '--proc', '/proc',

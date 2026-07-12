@@ -18,6 +18,7 @@ const SENSITIVE_HOST_PATHS = [
     '/run/docker.sock'
 ].map(value => path.resolve(value));
 const RESERVED_SANDBOX_TREES = ['/proc', '/dev', '/sys', '/workspace'];
+const RESERVED_SANDBOX_MOUNT_TREES = [...RESERVED_SANDBOX_TREES, '/tmp'];
 
 function pathContains(parentPath, childPath) {
     const relative = path.relative(parentPath, childPath);
@@ -26,9 +27,19 @@ function pathContains(parentPath, childPath) {
 
 export function assertSandboxWorkspaceSafe(instanceCwd) {
     const workspacePath = path.resolve(instanceCwd);
-    if (SENSITIVE_HOST_PATHS.some(sensitivePath => pathContains(workspacePath, sensitivePath) || pathContains(sensitivePath, workspacePath))) {
+    let realWorkspacePath;
+    try {
+        realWorkspacePath = fs.realpathSync.native(workspacePath);
+    } catch {
+        throw new Error('Shell sandbox workspace must exist and be accessible.');
+    }
+    if (realWorkspacePath !== workspacePath) {
+        throw new Error('Shell sandbox workspace must not contain symbolic links.');
+    }
+    if (SENSITIVE_HOST_PATHS.some(sensitivePath => pathContains(realWorkspacePath, sensitivePath) || pathContains(sensitivePath, realWorkspacePath))) {
         throw new Error('Shell sandbox workspace overlaps a sensitive panel data directory.');
     }
+    return realWorkspacePath;
 }
 
 export function assertSandboxWorkspaceDestinationSafe(instanceCwd) {
@@ -49,8 +60,14 @@ function assertSandboxAllowedPathSafe(allowedPath) {
     if (SENSITIVE_HOST_PATHS.some(overlaps)) {
         throw new Error('Shell sandbox allowed path overlaps a sensitive host path.');
     }
-    if (RESERVED_SANDBOX_TREES.some(reservedPath => overlaps(path.resolve(reservedPath))) || pathContains(realPath, '/tmp')) {
+    if (RESERVED_SANDBOX_MOUNT_TREES.some(reservedPath => overlaps(path.resolve(reservedPath)))) {
         throw new Error('Shell sandbox allowed path overlaps a reserved sandbox path.');
+    }
+    if (fs.existsSync(realPath)) {
+        const stats = fs.statSync(realPath);
+        if (!stats.isFile() && !stats.isDirectory()) {
+            throw new Error('Shell sandbox allowed paths must be regular files or directories.');
+        }
     }
 }
 
@@ -140,24 +157,27 @@ export function buildShellLaunch(
         throw new Error('Shell sandbox capability was not initialized.');
     }
     if (!sandboxCapability.supported) {
-        return {
-            file: shell,
-            args: ['-c', command],
-            cwd: instanceCwd,
-            env: buildInstanceEnvironment(instanceEnv, instanceCwd),
-            sandboxed: false,
-            sandboxReason: sandboxCapability.reason
-        };
+        if (process.platform !== 'linux') {
+            return {
+                file: shell,
+                args: ['-c', command],
+                cwd: instanceCwd,
+                env: buildInstanceEnvironment(instanceEnv, instanceCwd),
+                sandboxed: false,
+                sandboxReason: sandboxCapability.reason
+            };
+        }
+        throw new Error(`Shell sandbox is required but unavailable: ${sandboxCapability.reason || 'unknown reason'}.`);
     }
-    assertSandboxWorkspaceSafe(instanceCwd);
+    const workspacePath = assertSandboxWorkspaceSafe(instanceCwd);
     if (sandboxPreserveWorkspacePath) assertSandboxWorkspaceDestinationSafe(instanceCwd);
     const allowedPaths = normalizeSandboxAllowedPaths(sandboxAllowedPaths);
     const workspaceDestination = sandboxPreserveWorkspacePath ? path.resolve(instanceCwd) : '/workspace';
 
     return {
         file: sandboxCapability.binary,
-        args: buildBubblewrapArguments(instanceCwd, command, shell, allowedPaths, workspaceDestination),
-        cwd: instanceCwd,
+        args: buildBubblewrapArguments(workspacePath, command, shell, allowedPaths, workspaceDestination),
+        cwd: workspacePath,
         env: buildInstanceEnvironment(instanceEnv, workspaceDestination),
         sandboxed: true
     };

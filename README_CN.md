@@ -177,7 +177,7 @@ ExecStart=/usr/bin/node src/server.js
 ```
 *注意：修改后请运行 `sudo systemctl daemon-reload && sudo systemctl restart panel` 使配置生效。*
 
-Shell 实例默认启用沙箱。Linux 发布包内置静态链接的 Bubblewrap；源码安装可以通过 `BWRAP_BIN` 指定或使用系统安装版本。Panel 启动时会实际执行沙箱能力探针。如果当前平台或内核不支持，前端将隐藏开关并显示安全警告，Shell 实例启动时也会忽略已保存的沙箱设置。Windows 不支持 Bubblewrap，因此原生 Shell 实例不会获得此隔离；不可信的 Windows 工作负载应使用 Docker。
+Shell 实例默认启用沙箱。Linux 发布包内置静态链接的 Bubblewrap；源码安装可以通过 `BWRAP_BIN` 指定或使用系统安装版本。Panel 启动时会实际执行沙箱能力探针。在 Linux 上，如果 Bubblewrap 或所需内核功能不可用，要求沙箱隔离的实例将拒绝启动。Windows 不支持 Bubblewrap，因此原生 Shell 实例不会获得此隔离；不可信的 Windows 工作负载应使用 Docker。
 
 沙箱可用时会将实例工作目录映射为 `/workspace`，仅提供只读系统运行库，并隐藏面板数据库、会话、Docker socket 和其他主机路径。管理员可以按实例关闭隔离，但关闭后进程将拥有与 `panel` 系统账户相同的文件和服务访问能力。
 

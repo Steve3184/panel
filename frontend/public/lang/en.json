@@ -296,7 +296,7 @@
   "instances.sandbox.disabled.warning": "Sandboxing is disabled. This process can access files and services available to the panel account.",
   "instances.sandbox.enabled": "Isolate this Shell instance",
   "instances.sandbox.preserve_workspace_path": "Keep the original workspace path inside the sandbox",
-  "instances.sandbox.unsupported": "Shell isolation is not supported by this platform or system configuration. The sandbox setting will be ignored.",
+  "instances.sandbox.unsupported": "Shell isolation is unavailable. On Linux, Shell instances that require sandboxing will not start.",
   "instances.save": "Save Changes",
   "instances.search.placeholder": "Search instances...",
   "instances.select": "Select instance:",

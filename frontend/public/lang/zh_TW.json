@@ -296,7 +296,7 @@
   "instances.sandbox.disabled.warning": "沙箱已關閉。此程序可以存取面板系統帳戶有權存取的檔案與服務。",
   "instances.sandbox.enabled": "隔離此 Shell 執行個體",
   "instances.sandbox.preserve_workspace_path": "在沙箱內保留工作目錄的原始路徑",
-  "instances.sandbox.unsupported": "目前平台或系統設定不支援 Shell 隔離，執行個體啟動時將忽略沙箱設定。",
+  "instances.sandbox.unsupported": "目前系統無法提供 Shell 隔離。在 Linux 上，要求沙箱隔離的執行個體將拒絕啟動。",
   "instances.save": "儲存更改",
   "instances.search.placeholder": "搜尋實例...",
   "instances.select": "選擇實例：",

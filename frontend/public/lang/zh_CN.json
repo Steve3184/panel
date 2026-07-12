@@ -296,7 +296,7 @@
   "instances.sandbox.disabled.warning": "沙箱已关闭。该进程可以访问面板系统账户有权访问的文件和服务。",
   "instances.sandbox.enabled": "隔离此 Shell 实例",
   "instances.sandbox.preserve_workspace_path": "在沙箱内保留工作目录的原始路径",
-  "instances.sandbox.unsupported": "当前平台或系统配置不支持 Shell 隔离，实例启动时将忽略沙箱设置。",
+  "instances.sandbox.unsupported": "当前系统无法提供 Shell 隔离。在 Linux 上，要求沙箱隔离的实例将拒绝启动。",
   "instances.save": "保存更改",
   "instances.search.placeholder": "搜索实例...",
   "instances.select": "选择实例：",
