@@ -19,7 +19,12 @@ import i18n from './utils/i18n.js';
 import { readDb } from './data/db.js';
 import { panelSettings, panelSettingsReady } from './api/controllers/panelSettingsController.js';
 import { initLogger } from './utils/logger.js';
-import { hardenDataPermissions, loadSessionSecret, validateRequestOrigin } from './utils/security.js';
+import {
+    CONTENT_SECURITY_POLICY_DIRECTIVES,
+    hardenDataPermissions,
+    loadSessionSecret,
+    validateRequestOrigin
+} from './utils/security.js';
 import { initializeShellSandboxCapability } from './core/sandboxCapability.js';
 
 initLogger();
@@ -41,24 +46,7 @@ if (Number.isInteger(trustProxyHops) && trustProxyHops > 0) app.set('trust proxy
 // --- 配置中间件 ---
 app.use(helmet({
     contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            // Monaco Editor requires eval() for its worker compilation
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-            // Bootstrap and Monaco inject inline styles
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            // data: for base64 logos/backgrounds, blob: for Monaco worker URLs
-            imgSrc: ["'self'", "data:", "blob:"],
-            // WebSocket connections back to this same server
-            connectSrc: ["'self'", "ws:", "wss:"],
-            fontSrc: ["'self'", "data:"],
-            // Monaco workers are loaded as blob: URLs
-            workerSrc: ["'self'", "blob:"],
-            objectSrc: ["'none'"],
-            baseUri: ["'self'"],
-            // Prevent the panel from being embedded in iframes on other origins
-            frameAncestors: ["'none'"],
-        },
+        directives: CONTENT_SECURITY_POLICY_DIRECTIVES,
     },
     crossOriginEmbedderPolicy: false,
 }));

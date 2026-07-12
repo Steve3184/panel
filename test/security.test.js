@@ -4,10 +4,11 @@ import fs from 'fs-extra';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import helmet from 'helmet';
 
 import { isPathWithinRoot, resolvePathWithinRoot } from '../src/core/fileManager.js';
 import { serializeInstance } from '../src/api/serializers/instanceSerializer.js';
-import { isStrongEnoughPassword } from '../src/utils/security.js';
+import { CONTENT_SECURITY_POLICY_DIRECTIVES, isStrongEnoughPassword } from '../src/utils/security.js';
 import { isAuthenticated } from '../src/api/middleware/auth.js';
 import { readDb, writeDb } from '../src/data/db.js';
 import { containerBelongsToComposeInstance } from '../src/core/dockerSecurity.js';
@@ -73,6 +74,24 @@ test('password policy requires a bounded minimum length', () => {
     assert.equal(isStrongEnoughPassword('short'), false);
     assert.equal(isStrongEnoughPassword('long-enough-password'), true);
     assert.equal(isStrongEnoughPassword('x'.repeat(257)), false);
+});
+
+test('content security policy preserves direct HTTP access', () => {
+    const headers = new Map();
+    const middleware = helmet.contentSecurityPolicy({ directives: CONTENT_SECURITY_POLICY_DIRECTIVES });
+    const response = {
+        setHeader(name, value) {
+            headers.set(name.toLowerCase(), value);
+        }
+    };
+
+    middleware({}, response, error => {
+        if (error) throw error;
+    });
+
+    const policy = headers.get('content-security-policy');
+    assert.equal(policy.includes('upgrade-insecure-requests'), false);
+    assert.match(policy, /default-src 'self'/);
 });
 
 test('authentication middleware never treats a mounted root path as public', () => {

@@ -5,6 +5,27 @@ import { DB_PATH } from '../config.js';
 
 const SESSION_SECRET_PATH = path.join(DB_PATH, 'session-secret');
 
+export const CONTENT_SECURITY_POLICY_DIRECTIVES = {
+    defaultSrc: ["'self'"],
+    // Monaco Editor requires eval() for its worker compilation
+    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+    // Bootstrap and Monaco inject inline styles
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    // data: for base64 logos/backgrounds, blob: for Monaco worker URLs
+    imgSrc: ["'self'", 'data:', 'blob:'],
+    // WebSocket connections back to this same server
+    connectSrc: ["'self'", 'ws:', 'wss:'],
+    fontSrc: ["'self'", 'data:'],
+    // Monaco workers are loaded as blob: URLs
+    workerSrc: ["'self'", 'blob:'],
+    objectSrc: ["'none'"],
+    baseUri: ["'self'"],
+    // Prevent the panel from being embedded in iframes on other origins
+    frameAncestors: ["'none'"],
+    // Direct IP deployments must remain accessible over plain HTTP.
+    upgradeInsecureRequests: null,
+};
+
 export async function loadSessionSecret() {
     const configuredSecret = process.env.SESSION_SECRET;
     if (configuredSecret) {
