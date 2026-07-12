@@ -17,6 +17,7 @@ import {
     appendTerminalHistory,
     truncateTerminalOutput,
     assertSandboxWorkspaceSafe,
+    assertSandboxWorkspaceDestinationSafe,
     buildInstanceEnvironment,
     buildShellLaunch,
     normalizeSandboxAllowedPaths,
@@ -181,6 +182,19 @@ test('shell sandbox exposes configured host paths as read-only mounts', async ()
     const launch = buildShellLaunch(workspace, command, {}, true, [allowedPath]);
     const result = spawnSync(launch.file, launch.args, { cwd: launch.cwd, env: launch.env, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
+});
+
+test('shell sandbox can preserve the original workspace path', async () => {
+    const workspace = path.join(tempRoot, 'original-path-workspace');
+    await fs.ensureDir(workspace);
+    assert.throws(() => assertSandboxWorkspaceDestinationSafe('/proc/project'), /reserved sandbox path/);
+
+    if (!getShellSandboxCapability().supported) return;
+    const launch = buildShellLaunch(workspace, 'pwd; printf "%s\\n" "$HOME"', {}, true, [], true);
+    assert.equal(launch.env.HOME, workspace);
+    const result = spawnSync(launch.file, launch.args, { cwd: launch.cwd, env: launch.env, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.stdout.trim().split('\n'), [workspace, workspace]);
 });
 
 test('unsupported sandbox capability ignores saved sandbox settings at launch', () => {

@@ -356,7 +356,8 @@ export async function startInstance(instanceConfig) {
             commandToExecute,
             instanceConfig.env,
             instanceConfig.sandboxEnabled !== false,
-            instanceConfig.sandboxAllowedPaths
+            instanceConfig.sandboxAllowedPaths,
+            instanceConfig.sandboxPreserveWorkspacePath === true
         );
         if (instanceConfig.sandboxEnabled !== false && !launch.sandboxed) {
             console.warn(`Shell sandbox unavailable for instance ${instanceConfig.id}: ${launch.sandboxReason || 'disabled'}`);

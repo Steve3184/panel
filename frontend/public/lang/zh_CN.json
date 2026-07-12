@@ -295,6 +295,7 @@
   "instances.sandbox.allowed_paths.placeholder": "/home/user/.local/lib/python3.12/site-packages\n/opt/jdk-21",
   "instances.sandbox.disabled.warning": "沙箱已关闭。该进程可以访问面板系统账户有权访问的文件和服务。",
   "instances.sandbox.enabled": "隔离此 Shell 实例",
+  "instances.sandbox.preserve_workspace_path": "在沙箱内保留工作目录的原始路径",
   "instances.sandbox.unsupported": "当前平台或系统配置不支持 Shell 隔离，实例启动时将忽略沙箱设置。",
   "instances.save": "保存更改",
   "instances.search.placeholder": "搜索实例...",

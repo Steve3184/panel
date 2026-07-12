@@ -41,7 +41,15 @@
                             <div v-else-if="!form.sandboxEnabled" class="alert alert-danger py-2 mt-2 mb-0" role="alert">
                                 {{ $t('instances.sandbox.disabled.warning') }}
                             </div>
-                            <div v-if="shellSandboxSupported && form.sandboxEnabled" class="mt-3">
+                            <div v-if="shellSandboxSupported && form.sandboxEnabled" class="form-check form-switch mt-3">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                    id="create-sandbox-preserve-workspace-path"
+                                    v-model="form.sandboxPreserveWorkspacePath">
+                                <label class="form-check-label" for="create-sandbox-preserve-workspace-path">
+                                    {{ $t('instances.sandbox.preserve_workspace_path') }}
+                                </label>
+                            </div>
+                            <div v-if="shellSandboxSupported && form.sandboxEnabled" class="mt-2">
                                 <label for="create-sandbox-allowed-paths" class="form-label">{{ $t('instances.sandbox.allowed_paths') }}</label>
                                 <textarea class="form-control" id="create-sandbox-allowed-paths" rows="3"
                                     v-model="sandboxAllowedPathsText"
@@ -184,6 +192,7 @@ const form = ref({
     autoDeleteOnExit: false,
     sandboxEnabled: true,
     sandboxAllowedPaths: [],
+    sandboxPreserveWorkspacePath: false,
     env: '', // Changed to string for textarea
     dockerComposeContent: '',
     dockerConfig: {

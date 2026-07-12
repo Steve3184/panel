@@ -31,6 +31,16 @@ export function assertSandboxWorkspaceSafe(instanceCwd) {
     }
 }
 
+export function assertSandboxWorkspaceDestinationSafe(instanceCwd) {
+    const destinationPath = path.resolve(instanceCwd);
+    const overlapsReservedTree = RESERVED_SANDBOX_TREES.some(reservedPath =>
+        pathContains(reservedPath, destinationPath) || pathContains(destinationPath, reservedPath)
+    );
+    if (overlapsReservedTree) {
+        throw new Error('Shell sandbox original workspace path overlaps a reserved sandbox path.');
+    }
+}
+
 function assertSandboxAllowedPathSafe(allowedPath) {
     const resolvedPath = path.resolve(allowedPath);
     const realPath = fs.existsSync(resolvedPath) ? fs.realpathSync(resolvedPath) : resolvedPath;
@@ -107,7 +117,14 @@ export function buildInstanceEnvironment(instanceEnv = {}, homeDirectory = '/wor
     return environment;
 }
 
-export function buildShellLaunch(instanceCwd, command, instanceEnv = {}, sandboxEnabled = true, sandboxAllowedPaths = []) {
+export function buildShellLaunch(
+    instanceCwd,
+    command,
+    instanceEnv = {},
+    sandboxEnabled = true,
+    sandboxAllowedPaths = [],
+    sandboxPreserveWorkspacePath = false
+) {
     const shell = process.platform === 'win32' ? 'powershell.exe' : '/bin/bash';
     if (!sandboxEnabled) {
         return {
@@ -133,13 +150,15 @@ export function buildShellLaunch(instanceCwd, command, instanceEnv = {}, sandbox
         };
     }
     assertSandboxWorkspaceSafe(instanceCwd);
+    if (sandboxPreserveWorkspacePath) assertSandboxWorkspaceDestinationSafe(instanceCwd);
     const allowedPaths = normalizeSandboxAllowedPaths(sandboxAllowedPaths);
+    const workspaceDestination = sandboxPreserveWorkspacePath ? path.resolve(instanceCwd) : '/workspace';
 
     return {
         file: sandboxCapability.binary,
-        args: buildBubblewrapArguments(instanceCwd, command, shell, allowedPaths),
+        args: buildBubblewrapArguments(instanceCwd, command, shell, allowedPaths, workspaceDestination),
         cwd: instanceCwd,
-        env: buildInstanceEnvironment(instanceEnv),
+        env: buildInstanceEnvironment(instanceEnv, workspaceDestination),
         sandboxed: true
     };
 }

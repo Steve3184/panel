@@ -105,7 +105,15 @@
                 <div v-else-if="!form.sandboxEnabled" class="alert alert-danger py-2 mt-2 mb-0" role="alert">
                   {{ $t('instances.sandbox.disabled.warning') }}
                 </div>
-                <div v-if="shellSandboxSupported && form.sandboxEnabled" class="mt-3">
+                <div v-if="shellSandboxSupported && form.sandboxEnabled" class="form-check form-switch mt-3">
+                  <input class="form-check-input" type="checkbox" role="switch"
+                    id="settings-sandbox-preserve-workspace-path"
+                    v-model="form.sandboxPreserveWorkspacePath">
+                  <label class="form-check-label" for="settings-sandbox-preserve-workspace-path">
+                    {{ $t('instances.sandbox.preserve_workspace_path') }}
+                  </label>
+                </div>
+                <div v-if="shellSandboxSupported && form.sandboxEnabled" class="mt-2">
                   <label for="settings-sandbox-allowed-paths" class="form-label">{{ $t('instances.sandbox.allowed_paths') }}</label>
                   <textarea class="form-control" id="settings-sandbox-allowed-paths" rows="3"
                     v-model="sandboxAllowedPathsText"
@@ -312,6 +320,7 @@ onMounted(() => {
       form.value = JSON.parse(JSON.stringify(props.instance));
       form.value.sandboxEnabled ??= true;
       form.value.sandboxAllowedPaths ??= [];
+      form.value.sandboxPreserveWorkspacePath ??= false;
         loadDockerComposeContent();
         modal.show();
     }
@@ -328,6 +337,7 @@ watch(() => props.instance, (newInstance) => {
       form.value = JSON.parse(JSON.stringify(newInstance));
       form.value.sandboxEnabled ??= true;
       form.value.sandboxAllowedPaths ??= [];
+      form.value.sandboxPreserveWorkspacePath ??= false;
     }
 }, { immediate: true });
 
@@ -336,6 +346,7 @@ watch(() => uiStore.modals.instanceSettings, async (isVisible) => {
       form.value = JSON.parse(JSON.stringify(props.instance));
       form.value.sandboxEnabled ??= true;
       form.value.sandboxAllowedPaths ??= [];
+      form.value.sandboxPreserveWorkspacePath ??= false;
         await loadDockerComposeContent();
         modal.show();
     } else {

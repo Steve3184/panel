@@ -19,7 +19,7 @@ let capability = {
 };
 let initializationPromise;
 
-export function buildBubblewrapArguments(workspace, command, shell = '/bin/bash', allowedPaths = []) {
+export function buildBubblewrapArguments(workspace, command, shell = '/bin/bash', allowedPaths = [], workspaceDestination = '/workspace') {
     const allowedPathArguments = allowedPaths.flatMap(allowedPath => [
         '--ro-bind', allowedPath, allowedPath
     ]);
@@ -46,8 +46,8 @@ export function buildBubblewrapArguments(workspace, command, shell = '/bin/bash'
         '--ro-bind-try', '/etc/ssl', '/etc/ssl',
         '--ro-bind-try', '/etc/ca-certificates', '/etc/ca-certificates',
         ...allowedPathArguments,
-        '--bind', workspace, '/workspace',
-        '--chdir', '/workspace',
+        '--bind', workspace, workspaceDestination,
+        '--chdir', workspaceDestination,
         '--hostname', 'panel-instance',
         '--cap-drop', 'ALL',
         '--', shell, '-c', command
