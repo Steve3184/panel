@@ -41,6 +41,13 @@
                             <div v-else-if="!form.sandboxEnabled" class="alert alert-danger py-2 mt-2 mb-0" role="alert">
                                 {{ $t('instances.sandbox.disabled.warning') }}
                             </div>
+                            <div v-if="shellSandboxSupported && form.sandboxEnabled" class="mt-3">
+                                <label for="create-sandbox-allowed-paths" class="form-label">{{ $t('instances.sandbox.allowed_paths') }}</label>
+                                <textarea class="form-control" id="create-sandbox-allowed-paths" rows="3"
+                                    v-model="sandboxAllowedPathsText"
+                                    :placeholder="$t('instances.sandbox.allowed_paths.placeholder')"></textarea>
+                                <div class="form-text">{{ $t('instances.sandbox.allowed_paths.hint') }}</div>
+                            </div>
                         </div>
 
                         <!-- Docker Compose Content -->
@@ -176,6 +183,7 @@ const form = ref({
     autoStartOnBoot: false,
     autoDeleteOnExit: false,
     sandboxEnabled: true,
+    sandboxAllowedPaths: [],
     env: '', // Changed to string for textarea
     dockerComposeContent: '',
     dockerConfig: {
@@ -185,6 +193,13 @@ const form = ref({
         volumes: [], // Array of strings like "/host:/container"
         workingDir: '/workspace',
         command: '',
+    }
+});
+
+const sandboxAllowedPathsText = computed({
+    get: () => form.value.sandboxAllowedPaths.join('\n'),
+    set: (value) => {
+        form.value.sandboxAllowedPaths = value.split('\n').map(item => item.trim()).filter(Boolean);
     }
 });
 

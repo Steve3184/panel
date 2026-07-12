@@ -76,7 +76,7 @@ const isSaving = ref(false);
 
 onMounted(() => {
   modal = new bootstrap.Modal(modalEle.value, { backdrop: 'static', keyboard: false });
-  modalEle.value.addEventListener('hidden.bs.modal', cleanup);
+  modalEle.value.addEventListener('hidden.bs.modal', handleHidden);
   if (uiStore.modals.fileEditor) {
     modal.show();
     initializeEditor();
@@ -84,6 +84,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  modalEle.value?.removeEventListener('hidden.bs.modal', handleHidden);
   cleanup();
   modal?.dispose();
 });
@@ -312,6 +313,11 @@ const cleanup = () => {
   window.removeEventListener('keydown', handleKeyDown);
   disposeEditor();
   ws = null;
+};
+
+const handleHidden = () => {
+  cleanup();
+  uiStore.closeModal('fileEditor');
 };
 
 const close = () => uiStore.closeModal('fileEditor');

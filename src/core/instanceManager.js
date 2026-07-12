@@ -351,7 +351,13 @@ export async function startInstance(instanceConfig) {
         };
 
     } else {
-        const launch = buildShellLaunch(instanceCwd, commandToExecute, instanceConfig.env, instanceConfig.sandboxEnabled !== false);
+        const launch = buildShellLaunch(
+            instanceCwd,
+            commandToExecute,
+            instanceConfig.env,
+            instanceConfig.sandboxEnabled !== false,
+            instanceConfig.sandboxAllowedPaths
+        );
         if (instanceConfig.sandboxEnabled !== false && !launch.sandboxed) {
             console.warn(`Shell sandbox unavailable for instance ${instanceConfig.id}: ${launch.sandboxReason || 'disabled'}`);
         }

@@ -169,7 +169,11 @@
     <ExtractFileModal v-if="uiStore.modals.extractFile" :file="selectedFile" />
     <CompressFilesModal v-if="uiStore.modals.compressFiles" />
     <UploadFileModal v-if="uiStore.modals.uploadFile" />
-    <FileEditorModal v-if="uiStore.modals.fileEditor" :instance-id="fmStore.currentInstanceId" :file-path="selectedFile?.path" />
+    <FileEditorModal
+      v-if="uiStore.modals.fileEditor && fmStore.currentInstanceId && selectedFile?.path"
+      :instance-id="fmStore.currentInstanceId"
+      :file-path="selectedFile.path"
+    />
   </div>
 </template>
 

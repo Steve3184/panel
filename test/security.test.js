@@ -19,6 +19,7 @@ import {
     assertSandboxWorkspaceSafe,
     buildInstanceEnvironment,
     buildShellLaunch,
+    normalizeSandboxAllowedPaths,
     MAX_TERMINAL_HISTORY_BYTES,
     MAX_TERMINAL_HISTORY_LINES
 } from '../src/core/terminalSecurity.js';
@@ -160,6 +161,26 @@ test('shell sandbox hides host paths outside the bound workspace', async () => {
     const result = spawnSync(launch.file, launch.args, { cwd: launch.cwd, env: launch.env, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout.trim(), '/workspace');
+});
+
+test('shell sandbox exposes configured host paths as read-only mounts', async () => {
+    const workspace = path.join(tempRoot, 'allowed-path-workspace');
+    const allowedPath = path.join(tempRoot, 'external-jdk');
+    await fs.ensureDir(workspace);
+    await fs.ensureDir(allowedPath);
+    await fs.writeFile(path.join(allowedPath, 'release'), 'JAVA_VERSION=21');
+
+    const normalized = normalizeSandboxAllowedPaths([allowedPath, `${allowedPath}/../external-jdk`]);
+    assert.deepEqual(normalized, [allowedPath]);
+    assert.throws(() => normalizeSandboxAllowedPaths(['relative/path']), /absolute paths/);
+    assert.throws(() => normalizeSandboxAllowedPaths([path.dirname(DB_PATH)]), /sensitive host path/);
+    assert.throws(() => normalizeSandboxAllowedPaths(['/proc/version']), /reserved sandbox path/);
+
+    if (!getShellSandboxCapability().supported) return;
+    const command = `test -f ${JSON.stringify(path.join(allowedPath, 'release'))} && test ! -w ${JSON.stringify(allowedPath)}`;
+    const launch = buildShellLaunch(workspace, command, {}, true, [allowedPath]);
+    const result = spawnSync(launch.file, launch.args, { cwd: launch.cwd, env: launch.env, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
 });
 
 test('unsupported sandbox capability ignores saved sandbox settings at launch', () => {

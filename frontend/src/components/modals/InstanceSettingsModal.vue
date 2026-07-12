@@ -105,6 +105,13 @@
                 <div v-else-if="!form.sandboxEnabled" class="alert alert-danger py-2 mt-2 mb-0" role="alert">
                   {{ $t('instances.sandbox.disabled.warning') }}
                 </div>
+                <div v-if="shellSandboxSupported && form.sandboxEnabled" class="mt-3">
+                  <label for="settings-sandbox-allowed-paths" class="form-label">{{ $t('instances.sandbox.allowed_paths') }}</label>
+                  <textarea class="form-control" id="settings-sandbox-allowed-paths" rows="3"
+                    v-model="sandboxAllowedPathsText"
+                    :placeholder="$t('instances.sandbox.allowed_paths.placeholder')"></textarea>
+                  <div class="form-text">{{ $t('instances.sandbox.allowed_paths.hint') }}</div>
+                </div>
               </div>
               <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" role="switch" id="settings-autostart"
@@ -198,6 +205,15 @@ let modal = null;
 const form = ref(null);
 const deleteTarget = ref({});
 const shellSandboxSupported = computed(() => uiStore.capabilities?.shellSandbox?.supported === true);
+
+const sandboxAllowedPathsText = computed({
+    get: () => form.value?.sandboxAllowedPaths?.join('\n') || '',
+    set: (value) => {
+        if (form.value) {
+            form.value.sandboxAllowedPaths = value.split('\n').map(item => item.trim()).filter(Boolean);
+        }
+    }
+});
 
 const envString = computed({
     get: () => form.value?.env ? Object.entries(form.value.env).map(([k, v]) => `${k}=${v}`).join('\n') : '',
@@ -295,6 +311,7 @@ onMounted(() => {
     if (uiStore.modals.instanceSettings) {
       form.value = JSON.parse(JSON.stringify(props.instance));
       form.value.sandboxEnabled ??= true;
+      form.value.sandboxAllowedPaths ??= [];
         loadDockerComposeContent();
         modal.show();
     }
@@ -310,6 +327,7 @@ watch(() => props.instance, (newInstance) => {
     if (newInstance) {
       form.value = JSON.parse(JSON.stringify(newInstance));
       form.value.sandboxEnabled ??= true;
+      form.value.sandboxAllowedPaths ??= [];
     }
 }, { immediate: true });
 
@@ -317,6 +335,7 @@ watch(() => uiStore.modals.instanceSettings, async (isVisible) => {
     if (isVisible) {
       form.value = JSON.parse(JSON.stringify(props.instance));
       form.value.sandboxEnabled ??= true;
+      form.value.sandboxAllowedPaths ??= [];
         await loadDockerComposeContent();
         modal.show();
     } else {

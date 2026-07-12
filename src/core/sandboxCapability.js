@@ -19,7 +19,11 @@ let capability = {
 };
 let initializationPromise;
 
-export function buildBubblewrapArguments(workspace, command, shell = '/bin/bash') {
+export function buildBubblewrapArguments(workspace, command, shell = '/bin/bash', allowedPaths = []) {
+    const allowedPathArguments = allowedPaths.flatMap(allowedPath => [
+        '--ro-bind', allowedPath, allowedPath
+    ]);
+
     return [
         '--die-with-parent',
         '--new-session',
@@ -41,6 +45,7 @@ export function buildBubblewrapArguments(workspace, command, shell = '/bin/bash'
         '--ro-bind-try', '/etc/localtime', '/etc/localtime',
         '--ro-bind-try', '/etc/ssl', '/etc/ssl',
         '--ro-bind-try', '/etc/ca-certificates', '/etc/ca-certificates',
+        ...allowedPathArguments,
         '--bind', workspace, '/workspace',
         '--chdir', '/workspace',
         '--hostname', 'panel-instance',

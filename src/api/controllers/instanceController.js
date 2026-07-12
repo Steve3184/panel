@@ -6,6 +6,15 @@ import { broadcastToInstance } from '../../websocket/handler.js';
 import { serializeInstance } from '../serializers/instanceSerializer.js';
 import path from 'path';
 import fs from 'fs-extra';
+import { normalizeSandboxAllowedPaths } from '../../core/terminalSecurity.js';
+
+function parseSandboxAllowedPaths(value) {
+    try {
+        return normalizeSandboxAllowedPaths(value);
+    } catch {
+        return null;
+    }
+}
 
 export const getAllInstances = (req, res) => {
     const instances = readDb(INSTANCES_DB_PATH, []);
@@ -24,13 +33,15 @@ export const getAllInstances = (req, res) => {
 };
 
 export const createInstance = (req, res) => {
-    const { name, command, cwd, type, autoStartOnBoot, autoDeleteOnExit, autoRestart, env, dockerConfig, dockerComposeContent, sandboxEnabled } = req.body;
+    const { name, command, cwd, type, autoStartOnBoot, autoDeleteOnExit, autoRestart, env, dockerConfig, dockerComposeContent, sandboxEnabled, sandboxAllowedPaths } = req.body;
     if (type !== undefined && !['shell', 'docker', 'docker_compose'].includes(type)) return res.status(400).json({ message: 'server.invalid_action' });
     if (!command && type !== 'docker' && type !== 'docker_compose') return res.status(400).json({ message: 'server.command_required' });
     if (type === 'docker' && !dockerConfig?.image) return res.status(400).json({ message: 'server.image_required' });
     if (type === 'docker_compose' && !dockerComposeContent) return res.status(400).json({ message: 'server.docker_compose_not_found' });
     if (sandboxEnabled !== undefined && typeof sandboxEnabled !== 'boolean') return res.status(400).json({ message: 'server.invalid_action' });
     if (cwd !== undefined && cwd !== '' && (typeof cwd !== 'string' || !path.isAbsolute(cwd))) return res.status(400).json({ message: 'server.invalid_action' });
+    const normalizedSandboxAllowedPaths = parseSandboxAllowedPaths(sandboxAllowedPaths);
+    if (normalizedSandboxAllowedPaths === null) return res.status(400).json({ message: 'server.invalid_action' });
 
     const id = uuidv4();
     const finalCwd = cwd || path.join(WORKSPACES_PATH, id);
@@ -59,6 +70,7 @@ export const createInstance = (req, res) => {
         autoDeleteOnExit: !!autoDeleteOnExit,
         autoRestart: !!autoRestart,
         sandboxEnabled: (type || 'shell') === 'shell' ? sandboxEnabled !== false : undefined,
+        sandboxAllowedPaths: (type || 'shell') === 'shell' ? normalizedSandboxAllowedPaths : undefined,
         env: env || {},
         dockerConfig: dockerConfig || {},
         permissions: { [req.session.user.id]: { terminal: 'full-control', fileManagement: true } }
@@ -78,7 +90,7 @@ export const createInstance = (req, res) => {
 
 export const updateInstance = (req, res) => {
     const { id } = req.params;
-    const adminFields = ['name', 'type', 'command', 'cwd', 'autoStartOnBoot', 'autoDeleteOnExit', 'autoRestart', 'sandboxEnabled', 'env', 'dockerConfig'];
+    const adminFields = ['name', 'type', 'command', 'cwd', 'autoStartOnBoot', 'autoDeleteOnExit', 'autoRestart', 'sandboxEnabled', 'sandboxAllowedPaths', 'env', 'dockerConfig'];
     const allowedFields = req.session.user.role === 'admin' ? adminFields : ['name'];
     const updates = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowedFields.includes(key)));
     const dockerComposeContent = req.session.user.role === 'admin' ? req.body.dockerComposeContent : undefined;
@@ -98,6 +110,11 @@ export const updateInstance = (req, res) => {
     if (updates.sandboxEnabled !== undefined && typeof updates.sandboxEnabled !== 'boolean') {
         return res.status(400).json({ message: 'server.invalid_action' });
     }
+    if (updates.sandboxAllowedPaths !== undefined) {
+        const normalizedSandboxAllowedPaths = parseSandboxAllowedPaths(updates.sandboxAllowedPaths);
+        if (normalizedSandboxAllowedPaths === null) return res.status(400).json({ message: 'server.invalid_action' });
+        updates.sandboxAllowedPaths = normalizedSandboxAllowedPaths;
+    }
 
     const currentInstance = instances[instanceIndex];
     const effectiveType = updates.type || currentInstance.type;
@@ -106,6 +123,10 @@ export const updateInstance = (req, res) => {
         updates.sandboxEnabled = true;
     } else if (effectiveType !== 'shell') {
         updates.sandboxEnabled = undefined;
+        updates.sandboxAllowedPaths = undefined;
+    }
+    if (effectiveType === 'shell' && updates.sandboxAllowedPaths === undefined && currentInstance.sandboxAllowedPaths === undefined) {
+        updates.sandboxAllowedPaths = [];
     }
 
     if (effectiveType === 'docker_compose' && dockerComposeContent !== undefined) {
