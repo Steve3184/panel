@@ -23,6 +23,7 @@ import {
     CONTENT_SECURITY_POLICY_DIRECTIVES,
     hardenDataPermissions,
     loadSessionSecret,
+    prepareSessionStore,
     validateRequestOrigin
 } from './utils/security.js';
 import { initializeShellSandboxCapability } from './core/sandboxCapability.js';
@@ -32,6 +33,10 @@ initLogger();
 await hardenDataPermissions([DB_PATH, SESSIONS_PATH, WORKSPACES_PATH, UPLOAD_TEMP_DIR]);
 await fs.emptyDir(UPLOAD_TEMP_DIR);
 const sessionSecret = await loadSessionSecret();
+const sessionStorePreparation = await prepareSessionStore(SESSIONS_PATH, sessionSecret);
+if (sessionStorePreparation.removedSessions > 0) {
+    console.warn(`Removed ${sessionStorePreparation.removedSessions} incompatible session file(s). Users must sign in again.`);
+}
 const sandboxCapability = await initializeShellSandboxCapability();
 console.log(`Shell sandbox: ${sandboxCapability.supported ? `${sandboxCapability.source} ${sandboxCapability.version}` : `unavailable (${sandboxCapability.reason})`}`);
 await panelSettingsReady;

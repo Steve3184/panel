@@ -4,6 +4,8 @@ import path from 'path';
 import { DB_PATH } from '../config.js';
 
 const SESSION_SECRET_PATH = path.join(DB_PATH, 'session-secret');
+const SESSION_STORE_FORMAT = 1;
+const SESSION_STORE_METADATA_FILE = '.panel-session-store';
 
 export const CONTENT_SECURITY_POLICY_DIRECTIVES = {
     defaultSrc: ["'self'"],
@@ -49,6 +51,47 @@ export async function loadSessionSecret() {
     const generatedSecret = crypto.randomBytes(48).toString('hex');
     await fs.writeFile(SESSION_SECRET_PATH, generatedSecret, { mode: 0o600, flag: 'wx' });
     return generatedSecret;
+}
+
+export async function prepareSessionStore(sessionPath, sessionSecret) {
+    if (typeof sessionSecret !== 'string' || sessionSecret.length === 0) {
+        throw new Error('A session secret is required to prepare the session store.');
+    }
+
+    await fs.ensureDir(sessionPath, 0o700);
+    await fs.chmod(sessionPath, 0o700);
+    const metadataPath = path.join(sessionPath, SESSION_STORE_METADATA_FILE);
+    const expectedMetadata = {
+        format: SESSION_STORE_FORMAT,
+        secretFingerprint: crypto.createHash('sha256').update(sessionSecret).digest('hex')
+    };
+
+    try {
+        const metadata = await fs.readJson(metadataPath);
+        if (metadata && typeof metadata === 'object' &&
+            metadata.format === expectedMetadata.format &&
+            metadata.secretFingerprint === expectedMetadata.secretFingerprint) {
+            await fs.chmod(metadataPath, 0o600);
+            return { reset: false, removedSessions: 0, metadataPath };
+        }
+    } catch (error) {
+        if (error.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error;
+    }
+
+    const entries = await fs.readdir(sessionPath, { withFileTypes: true });
+    const sessionEntries = entries.filter(entry => entry.name.endsWith('.json'));
+    await Promise.all(sessionEntries.map(entry => fs.remove(path.join(sessionPath, entry.name))));
+
+    const temporaryMetadataPath = `${metadataPath}.${process.pid}.${crypto.randomBytes(6).toString('hex')}`;
+    try {
+        await fs.writeJson(temporaryMetadataPath, expectedMetadata, { mode: 0o600, flag: 'wx' });
+        await fs.move(temporaryMetadataPath, metadataPath, { overwrite: true });
+        await fs.chmod(metadataPath, 0o600);
+    } finally {
+        await fs.remove(temporaryMetadataPath);
+    }
+
+    return { reset: true, removedSessions: sessionEntries.length, metadataPath };
 }
 
 export async function hardenDataPermissions(directories) {
