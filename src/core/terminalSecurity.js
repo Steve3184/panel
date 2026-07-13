@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { DB_PATH, SESSIONS_PATH, UPLOAD_TEMP_DIR } from '../config.js';
-import { buildBubblewrapArguments, getShellSandboxCapability } from './sandboxCapability.js';
+import { buildBubblewrapArguments, DEFAULT_SANDBOX_PATH, getShellSandboxCapability } from './sandboxCapability.js';
 
 export const MAX_TERMINAL_HISTORY_LINES = 2_000;
 export const MAX_TERMINAL_HISTORY_BYTES = 2 * 1024 * 1024;
@@ -16,9 +16,28 @@ const SENSITIVE_HOST_PATHS = [
     UPLOAD_TEMP_DIR,
     '/var/run/docker.sock',
     '/run/docker.sock'
-].map(value => path.resolve(value));
+].map(resolvePathThroughExistingAncestors);
 const RESERVED_SANDBOX_TREES = ['/proc', '/dev', '/sys', '/workspace'];
 const RESERVED_SANDBOX_MOUNT_TREES = [...RESERVED_SANDBOX_TREES, '/tmp'];
+
+function resolvePathThroughExistingAncestors(value) {
+    const resolvedPath = path.resolve(value);
+    const missingSegments = [];
+    let existingPath = resolvedPath;
+
+    while (!fs.existsSync(existingPath)) {
+        const parentPath = path.dirname(existingPath);
+        if (parentPath === existingPath) return resolvedPath;
+        missingSegments.unshift(path.basename(existingPath));
+        existingPath = parentPath;
+    }
+
+    try {
+        return path.join(fs.realpathSync.native(existingPath), ...missingSegments);
+    } catch {
+        return resolvedPath;
+    }
+}
 
 function pathContains(parentPath, childPath) {
     const relative = path.relative(parentPath, childPath);
@@ -54,21 +73,27 @@ export function assertSandboxWorkspaceDestinationSafe(instanceCwd) {
 
 function assertSandboxAllowedPathSafe(allowedPath) {
     const resolvedPath = path.resolve(allowedPath);
-    const realPath = fs.existsSync(resolvedPath) ? fs.realpathSync(resolvedPath) : resolvedPath;
-    const overlaps = candidate => pathContains(candidate, realPath) || pathContains(realPath, candidate);
-
-    if (SENSITIVE_HOST_PATHS.some(overlaps)) {
-        throw new Error('Shell sandbox allowed path overlaps a sensitive host path.');
-    }
-    if (RESERVED_SANDBOX_MOUNT_TREES.some(reservedPath => overlaps(path.resolve(reservedPath)))) {
-        throw new Error('Shell sandbox allowed path overlaps a reserved sandbox path.');
-    }
-    if (fs.existsSync(realPath)) {
-        const stats = fs.statSync(realPath);
-        if (!stats.isFile() && !stats.isDirectory()) {
-            throw new Error('Shell sandbox allowed paths must be regular files or directories.');
+    const overlaps = (candidate, checkedPath) => pathContains(candidate, checkedPath) || pathContains(checkedPath, candidate);
+    const assertPathPolicy = checkedPath => {
+        if (SENSITIVE_HOST_PATHS.some(candidate => overlaps(candidate, checkedPath))) {
+            throw new Error('Shell sandbox allowed path overlaps a sensitive host path.');
         }
+        if (RESERVED_SANDBOX_MOUNT_TREES.some(candidate => overlaps(path.resolve(candidate), checkedPath))) {
+            throw new Error('Shell sandbox allowed path overlaps a reserved sandbox path.');
+        }
+    };
+
+    assertPathPolicy(resolvedPath);
+    if (!fs.existsSync(resolvedPath)) {
+        throw new Error('Shell sandbox allowed paths must exist.');
     }
+    const realPath = fs.realpathSync.native(resolvedPath);
+    assertPathPolicy(realPath);
+    const stats = fs.statSync(realPath);
+    if (!stats.isFile() && !stats.isDirectory()) {
+        throw new Error('Shell sandbox allowed paths must be regular files or directories.');
+    }
+    return realPath;
 }
 
 export function normalizeSandboxAllowedPaths(allowedPaths = []) {
@@ -123,15 +148,38 @@ export function buildInstanceEnvironment(instanceEnv = {}, homeDirectory = '/wor
     }
     for (const [key, value] of Object.entries(instanceEnv || {})) {
         if (VALID_ENV_KEY.test(key) && ['string', 'number', 'boolean'].includes(typeof value)) {
-            environment[key] = String(value);
+            const stringValue = String(value);
+            if (stringValue.includes('\0')) throw new Error('Shell environment values must not contain null bytes.');
+            environment[key] = stringValue;
         }
     }
 
     environment.HOME = homeDirectory;
+    environment.PWD = homeDirectory;
     environment.TMPDIR = '/tmp';
     environment.TERM = 'xterm-color';
-    environment.PATH ||= '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+    environment.PATH ||= DEFAULT_SANDBOX_PATH;
     return environment;
+}
+
+export function buildSandboxLauncherEnvironment() {
+    const environment = {};
+    for (const key of SAFE_HOST_ENV_KEYS) {
+        if (typeof process.env[key] === 'string') environment[key] = process.env[key];
+    }
+    environment.PATH ||= DEFAULT_SANDBOX_PATH;
+    environment.TERM = 'xterm-color';
+    return environment;
+}
+
+function buildSandboxAllowedMounts(allowedPaths, workspacePath, workspaceDestination) {
+    return allowedPaths.map(destination => {
+        const source = assertSandboxAllowedPathSafe(destination);
+        if (pathContains(workspacePath, source) || pathContains(workspaceDestination, destination)) {
+            throw new Error('Shell sandbox allowed path overlaps the writable workspace.');
+        }
+        return { source, destination };
+    });
 }
 
 export function buildShellLaunch(
@@ -173,12 +221,21 @@ export function buildShellLaunch(
     if (sandboxPreserveWorkspacePath) assertSandboxWorkspaceDestinationSafe(instanceCwd);
     const allowedPaths = normalizeSandboxAllowedPaths(sandboxAllowedPaths);
     const workspaceDestination = sandboxPreserveWorkspacePath ? path.resolve(instanceCwd) : '/workspace';
+    const allowedMounts = buildSandboxAllowedMounts(allowedPaths, workspacePath, workspaceDestination);
+    const commandEnvironment = buildInstanceEnvironment(instanceEnv, workspaceDestination);
 
     return {
         file: sandboxCapability.binary,
-        args: buildBubblewrapArguments(workspacePath, command, shell, allowedPaths, workspaceDestination),
+        args: buildBubblewrapArguments(
+            workspacePath,
+            command,
+            shell,
+            allowedMounts,
+            workspaceDestination,
+            commandEnvironment
+        ),
         cwd: workspacePath,
-        env: buildInstanceEnvironment(instanceEnv, workspaceDestination),
+        env: buildSandboxLauncherEnvironment(),
         sandboxed: true
     };
 }

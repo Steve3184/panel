@@ -44,20 +44,41 @@ PROBE_WORKSPACE="$TEMP_DIR/sandbox-workspace"
 mkdir -p "$PROBE_WORKSPACE"
 touch "$PROBE_WORKSPACE/visible"
 if "$OUTPUT_DIR/bwrap" --unshare-user --ro-bind / / /bin/true 2>/dev/null; then
-    "$OUTPUT_DIR/bwrap" \
+    PROBE_OUTPUT=$("$OUTPUT_DIR/bwrap" \
         --die-with-parent \
         --new-session \
+        --unshare-user \
+        --disable-userns \
+        --assert-userns-disabled \
         --unshare-all \
         --share-net \
+        --clearenv \
+        --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
         --proc /proc \
         --dev /dev \
+        --tmpfs /tmp \
         --ro-bind /usr /usr \
         --ro-bind-try /bin /bin \
         --ro-bind-try /lib /lib \
         --ro-bind-try /lib64 /lib64 \
+        --dir /etc \
+        --ro-bind-try /etc/passwd /etc/passwd \
+        --ro-bind-try /etc/group /etc/group \
+        --ro-bind-try /etc/nsswitch.conf /etc/nsswitch.conf \
+        --ro-bind-try /etc/hosts /etc/hosts \
+        --ro-bind-try /etc/resolv.conf /etc/resolv.conf \
+        --ro-bind-try /etc/localtime /etc/localtime \
+        --ro-bind-try /etc/ssl /etc/ssl \
+        --ro-bind-try /etc/ca-certificates /etc/ca-certificates \
         --bind "$PROBE_WORKSPACE" /workspace \
         --chdir /workspace \
-        -- /bin/sh -c 'test -f /workspace/visible'
+        --hostname panel-instance \
+        --cap-drop ALL \
+        -- /bin/sh -c 'test -f /workspace/visible && printf "%s\n" panel-bwrap-probe')
+    [ "$PROBE_OUTPUT" = 'panel-bwrap-probe' ] || {
+        echo 'Bubblewrap sandbox probe returned unexpected output.' >&2
+        exit 1
+    }
 else
     printf 'Warning: unprivileged user namespaces unavailable, skipping sandbox probe\n' >&2
 fi

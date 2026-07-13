@@ -51,6 +51,10 @@ jobs:
         env:
           npm_config_arch: ${{ matrix.arch }}
           npm_config_platform: ${{ matrix.platform }}
+
+      - name: Run backend tests
+        if: matrix.platform == 'linux' && matrix.arch == 'x64'
+        run: npm test
       
       - name: Install frontend dependencies
         run: npm install

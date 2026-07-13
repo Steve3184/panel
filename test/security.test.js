@@ -284,7 +284,6 @@ test('shell sandbox can preserve the original workspace path', async () => {
 
     if (!getShellSandboxCapability().supported) return;
     const launch = buildShellLaunch(workspace, 'pwd; printf "%s\\n" "$HOME"', {}, true, [], true);
-    assert.equal(launch.env.HOME, workspace);
     const result = spawnSync(launch.file, launch.args, { cwd: launch.cwd, env: launch.env, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(result.stdout.trim().split('\n'), [workspace, workspace]);

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 
 const execFileAsync = promisify(execFile);
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+export const DEFAULT_SANDBOX_PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
 
 let capability = {
     checked: process.platform !== 'linux',
@@ -19,9 +20,19 @@ let capability = {
 };
 let initializationPromise;
 
-export function buildBubblewrapArguments(workspace, command, shell = '/bin/bash', allowedPaths = [], workspaceDestination = '/workspace') {
-    const allowedPathArguments = allowedPaths.flatMap(allowedPath => [
-        '--ro-bind', allowedPath, allowedPath
+export function buildBubblewrapArguments(
+    workspace,
+    command,
+    shell = '/bin/bash',
+    allowedMounts = [],
+    workspaceDestination = '/workspace',
+    commandEnvironment = {}
+) {
+    const allowedPathArguments = allowedMounts.flatMap(mount => [
+        '--ro-bind', mount.source, mount.destination
+    ]);
+    const environmentArguments = Object.entries(commandEnvironment).flatMap(([key, value]) => [
+        '--setenv', key, String(value)
     ]);
 
     return [
@@ -32,6 +43,8 @@ export function buildBubblewrapArguments(workspace, command, shell = '/bin/bash'
         '--assert-userns-disabled',
         '--unshare-all',
         '--share-net',
+        '--clearenv',
+        ...environmentArguments,
         '--proc', '/proc',
         '--dev', '/dev',
         '--tmpfs', '/tmp',
@@ -88,14 +101,29 @@ async function probeCandidate(candidate) {
         await fs.ensureDir(workspace);
         await fs.writeFile(path.join(workspace, 'visible'), 'visible');
         await fs.writeFile(hiddenFile, 'secret');
-        const command = `test -f /workspace/visible && test ! -e ${JSON.stringify(hiddenFile)}`;
-        await execFileAsync(candidate.binary, buildBubblewrapArguments(workspace, command, '/bin/sh'), {
+        const marker = `panel-bwrap-probe-${process.pid}-${Date.now()}`;
+        const command = `test -f /workspace/visible && test ! -e ${JSON.stringify(hiddenFile)} && printf '%s\\n' ${JSON.stringify(marker)}`;
+        const { stdout: probeOutput } = await execFileAsync(candidate.binary, buildBubblewrapArguments(
+            workspace,
+            command,
+            '/bin/sh',
+            [],
+            '/workspace',
+            { PATH: DEFAULT_SANDBOX_PATH }
+        ), {
             timeout: 10_000,
             maxBuffer: 64 * 1024,
-            env: { PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' }
+            env: { PATH: DEFAULT_SANDBOX_PATH }
         });
-        const { stdout } = await execFileAsync(candidate.binary, ['--version'], { timeout: 5_000 });
-        return stdout.trim();
+        if (probeOutput.trim() !== marker) throw new Error('probe-output-mismatch');
+
+        const { stdout } = await execFileAsync(candidate.binary, ['--version'], {
+            timeout: 5_000,
+            env: { PATH: DEFAULT_SANDBOX_PATH }
+        });
+        const version = stdout.trim();
+        if (!/^bubblewrap \d+(?:\.\d+)+/.test(version)) throw new Error('invalid-version-output');
+        return version;
     } finally {
         await fs.remove(probeRoot);
     }
