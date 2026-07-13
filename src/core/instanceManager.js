@@ -11,6 +11,7 @@ import { broadcastToInstance } from '../websocket/handler.js';
 import { isPathWithinRoot } from './fileManager.js';
 import { appendTerminalHistory, buildShellLaunch, truncateTerminalOutput } from './terminalSecurity.js';
 import { containerBelongsToComposeInstance } from './dockerSecurity.js';
+import { interruptPty } from './ptyControl.js';
 import i18n from '../utils/i18n.js';
 
 const execAsync = promisify(exec);
@@ -151,6 +152,7 @@ export async function startInstance(instanceConfig) {
     fs.ensureDirSync(instanceCwd);
 
     let term;
+    let sandboxed = false;
     let commandToExecute = instanceConfig.command;
     // Startup output captured for docker_compose; prepended to session history.
     let composeStartupOutput = '';
@@ -359,6 +361,7 @@ export async function startInstance(instanceConfig) {
             instanceConfig.sandboxAllowedPaths,
             instanceConfig.sandboxPreserveWorkspacePath === true
         );
+        sandboxed = launch.sandboxed;
         const ptyOptions = {
             name: 'xterm-color', cols: 80, rows: 30, cwd: instanceCwd,
             env: launch.env
@@ -375,6 +378,7 @@ export async function startInstance(instanceConfig) {
         restartAttempts: 0,
         restartTimer: null,
         restartTimeout: null,
+        sandboxed,
     };
     activeInstances.set(instanceConfig.id, session);
 
@@ -487,7 +491,7 @@ export async function stopInstance(instanceId, signal = 'SIGTERM', isUserTrigger
         if (instanceConfig.type !== 'docker') {
             // 对于非 Docker 实例，通过 pty 包装器来停止
             if (signal === 'SIGTERM') {
-                activeSession.pty.write('\x03'); // 发送 Ctrl+C
+                await interruptPty(activeSession.pty, activeSession.sandboxed);
             } else {
                 activeSession.pty.kill(signal);
             }
@@ -519,6 +523,12 @@ export async function stopInstance(instanceId, signal = 'SIGTERM', isUserTrigger
             }
         }
     }
+}
+
+export async function interruptInstance(instanceId) {
+    const activeSession = activeInstances.get(instanceId);
+    if (!activeSession) return;
+    await interruptPty(activeSession.pty, activeSession.sandboxed);
 }
 
 export async function deleteInstance(instanceId, deleteData = true) {

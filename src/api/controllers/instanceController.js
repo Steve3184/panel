@@ -206,8 +206,7 @@ export const handleInstanceAction = async (req, res) => {
                 await instanceManager.startInstance(instanceConfig);
                 break;
             case 'interrupt':
-                const session = instanceManager.activeInstances.get(id);
-                if (session) session.pty.write('\x03');
+                await instanceManager.interruptInstance(id);
                 break;
             default: return res.status(400).json({ message: 'server.invalid_action' });
         }

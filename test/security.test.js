@@ -6,6 +6,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import helmet from 'helmet';
+import pty from 'node-pty';
 
 import { isPathWithinRoot, resolvePathWithinRoot } from '../src/core/fileManager.js';
 import { serializeInstance } from '../src/api/serializers/instanceSerializer.js';
@@ -27,6 +28,7 @@ import {
 } from '../src/core/terminalSecurity.js';
 import { DB_PATH } from '../src/config.js';
 import { getShellSandboxCapability, initializeShellSandboxCapability } from '../src/core/sandboxCapability.js';
+import { interruptPty } from '../src/core/ptyControl.js';
 
 let tempRoot;
 let allowedPathRoot;
@@ -175,6 +177,56 @@ test('shell sandbox prevents nested user namespaces', () => {
     const launch = buildShellLaunch(tempRoot, "unshare --user --map-root-user true >/dev/null 2>&1; test $? -ne 0");
     const result = spawnSync(launch.file, launch.args, { cwd: launch.cwd, env: launch.env, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
+});
+
+test('sandboxed shell Ctrl+C reaches the command process group', async () => {
+    if (!getShellSandboxCapability().supported) return;
+
+    const workspace = path.join(tempRoot, 'sandbox-interrupt-workspace');
+    await fs.ensureDir(workspace);
+    const launch = buildShellLaunch(
+        workspace,
+        "trap 'echo SANDBOX_GOT_INT; exit 23' INT; echo SANDBOX_READY; while :; do sleep 1; done"
+    );
+    const terminal = pty.spawn(launch.file, launch.args, {
+        name: 'xterm-color',
+        cols: 80,
+        rows: 30,
+        cwd: launch.cwd,
+        env: launch.env
+    });
+
+    let output = '';
+    let exited = false;
+    const ready = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Sandbox command did not become ready.')), 5_000);
+        terminal.onData(data => {
+            output += data;
+            if (output.includes('SANDBOX_READY')) {
+                clearTimeout(timer);
+                resolve();
+            }
+        });
+    });
+    const exit = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Sandbox command did not exit after Ctrl+C.')), 5_000);
+        terminal.onExit(event => {
+            exited = true;
+            clearTimeout(timer);
+            resolve(event);
+        });
+    });
+
+    try {
+        await ready;
+        await interruptPty(terminal, true);
+        const event = await exit;
+        assert.match(output, /SANDBOX_GOT_INT/);
+        assert.equal(event.exitCode, 23);
+        assert.equal(event.signal, 0);
+    } finally {
+        if (!exited) terminal.kill('SIGKILL');
+    }
 });
 
 test('shell sandbox hides host paths outside the bound workspace', async () => {
