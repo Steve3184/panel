@@ -22,6 +22,11 @@ export const setupAdmin = async (req, res) => {
         return res.status(400).json({ message: 'server.password_requirements' });
     }
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    // Hashing yields to other setup requests. Recheck immediately before the
+    // synchronous write so only the first completed setup can initialize users.
+    if (readDb(USERS_DB_PATH, []).length > 0) {
+        return res.status(403).json({ message: 'server.setup_already_completed' });
+    }
     const adminUser = { id: uuidv4(), username, passwordHash, role: 'admin', sessionVersion: 0 };
     writeDb(USERS_DB_PATH, [adminUser]);
     req.app.get('userEvents')?.emit('userAdded');

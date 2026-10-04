@@ -7,6 +7,7 @@ import session from 'express-session';
 import FileStoreFactory from 'session-file-store';
 
 import { prepareSessionStore } from '../src/utils/security.js';
+import { createSessionCodec } from '../src/utils/sessionCodec.js';
 
 const temporaryDirectories = new Set();
 
@@ -72,12 +73,12 @@ test('session store migration recovers from invalid metadata', async () => {
 test('prepared encrypted session files can be read by session-file-store', async () => {
     const sessionPath = await createSessionDirectory();
     const sessionSecret = 'c'.repeat(64);
-    await prepareSessionStore(sessionPath, sessionSecret);
+    const prepared = await prepareSessionStore(sessionPath, sessionSecret);
 
     const FileStore = FileStoreFactory(session);
     const store = new FileStore({
         path: sessionPath,
-        secret: sessionSecret,
+        ...createSessionCodec(sessionSecret, prepared.encryptionSalt),
         reapInterval: -1,
         logFn() {}
     });

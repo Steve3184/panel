@@ -4,7 +4,7 @@ import path from 'path';
 import { DB_PATH } from '../config.js';
 
 const SESSION_SECRET_PATH = path.join(DB_PATH, 'session-secret');
-const SESSION_STORE_FORMAT = 1;
+const SESSION_STORE_FORMAT = 2;
 const SESSION_STORE_METADATA_FILE = '.panel-session-store';
 
 export const CONTENT_SECURITY_POLICY_DIRECTIVES = {
@@ -70,9 +70,10 @@ export async function prepareSessionStore(sessionPath, sessionSecret) {
         const metadata = await fs.readJson(metadataPath);
         if (metadata && typeof metadata === 'object' &&
             metadata.format === expectedMetadata.format &&
-            metadata.secretFingerprint === expectedMetadata.secretFingerprint) {
+            metadata.secretFingerprint === expectedMetadata.secretFingerprint &&
+            typeof metadata.encryptionSalt === 'string' && /^[a-f0-9]{64}$/.test(metadata.encryptionSalt)) {
             await fs.chmod(metadataPath, 0o600);
-            return { reset: false, removedSessions: 0, metadataPath };
+            return { reset: false, removedSessions: 0, metadataPath, encryptionSalt: metadata.encryptionSalt };
         }
     } catch (error) {
         if (error.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error;
@@ -81,6 +82,7 @@ export async function prepareSessionStore(sessionPath, sessionSecret) {
     const entries = await fs.readdir(sessionPath, { withFileTypes: true });
     const sessionEntries = entries.filter(entry => entry.name.endsWith('.json'));
     await Promise.all(sessionEntries.map(entry => fs.remove(path.join(sessionPath, entry.name))));
+    expectedMetadata.encryptionSalt = crypto.randomBytes(32).toString('hex');
 
     const temporaryMetadataPath = `${metadataPath}.${process.pid}.${crypto.randomBytes(6).toString('hex')}`;
     try {
@@ -91,7 +93,7 @@ export async function prepareSessionStore(sessionPath, sessionSecret) {
         await fs.remove(temporaryMetadataPath);
     }
 
-    return { reset: true, removedSessions: sessionEntries.length, metadataPath };
+    return { reset: true, removedSessions: sessionEntries.length, metadataPath, encryptionSalt: expectedMetadata.encryptionSalt };
 }
 
 export async function hardenDataPermissions(directories) {

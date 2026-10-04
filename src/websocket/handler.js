@@ -40,6 +40,22 @@ export function send(ws, data) {
     }
 }
 
+// Terminal subscriptions outlive individual requests. Recheck both the current
+// account/session and instance permission before every outgoing terminal chunk.
+export function sendTerminalOutput(instanceId, listeners, output) {
+    const payload = { type: 'output', id: instanceId, data: truncateTerminalOutput(output) };
+    for (const ws of listeners) {
+        const user = ws.readyState === 1 ? refreshWebSocketUser(ws) : null;
+        if (!user || !checkUserInstancePermission(user, instanceId, 'read-only', false)) {
+            listeners.delete(ws);
+            if (ws.subscribedInstanceId === instanceId) ws.subscribedInstanceId = null;
+            if (!user && ws.readyState === 1) ws.close(1008, 'Session expired');
+            continue;
+        }
+        send(ws, payload);
+    }
+}
+
 /**
  * 广播数据给所有（或部分）客户端。
  * @param {object} data 要广播的数据对象

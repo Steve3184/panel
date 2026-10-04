@@ -7,9 +7,9 @@ import { promisify } from 'util';
 import { PassThrough } from 'stream';
 import { readDb, writeDb } from '../data/db.js';
 import { INSTANCES_DB_PATH, WORKSPACES_PATH } from '../config.js';
-import { broadcastToInstance } from '../websocket/handler.js';
+import { broadcastToInstance, sendTerminalOutput } from '../websocket/handler.js';
 import { isPathWithinRoot } from './fileManager.js';
-import { appendTerminalHistory, buildShellLaunch, truncateTerminalOutput } from './terminalSecurity.js';
+import { appendTerminalHistory, buildShellLaunch } from './terminalSecurity.js';
 import { containerBelongsToComposeInstance } from './dockerSecurity.js';
 import { interruptPty } from './ptyControl.js';
 import i18n from '../utils/i18n.js';
@@ -387,10 +387,7 @@ export async function startInstance(instanceConfig) {
     term.on('data', (data) => {
         const output = data.toString('utf8');
         session.history = appendTerminalHistory(session.history, output);
-        const truncatedOutput = truncateTerminalOutput(output);
-        session.listeners.forEach(ws => {
-            if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceConfig.id, data: truncatedOutput }));
-        });
+        sendTerminalOutput(instanceConfig.id, session.listeners, output);
     });
 
     term.on('exit', async (code) => { // 接收退出码
@@ -710,9 +707,7 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
 
         const switchMsg = `\r\n\x1b[33m--- Switched to container: ${containerName} ---\x1b[0m\r\n`;
         session.history = appendTerminalHistory(session.history, switchMsg);
-        session.listeners.forEach(ws => {
-            if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceId, data: switchMsg }));
-        });
+        sendTerminalOutput(instanceId, session.listeners, switchMsg);
 
         const normalizeOutput = (data) => {
             let str = data.toString('utf8');
@@ -757,9 +752,7 @@ export async function switchDockerComposeContainer(instanceId, containerName) {
         term.on('data', (data) => {
             const output = data.toString('utf8');
             session.history = appendTerminalHistory(session.history, output);
-            session.listeners.forEach(ws => {
-                if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'output', id: instanceId, data: output }));
-            });
+            sendTerminalOutput(instanceId, session.listeners, output);
         });
 
         session.pty = term;

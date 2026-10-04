@@ -27,6 +27,7 @@ import {
     validateRequestOrigin
 } from './utils/security.js';
 import { initializeShellSandboxCapability } from './core/sandboxCapability.js';
+import { createSessionCodec } from './utils/sessionCodec.js';
 
 initLogger();
 
@@ -34,6 +35,7 @@ await hardenDataPermissions([DB_PATH, SESSIONS_PATH, WORKSPACES_PATH, UPLOAD_TEM
 await fs.emptyDir(UPLOAD_TEMP_DIR);
 const sessionSecret = await loadSessionSecret();
 const sessionStorePreparation = await prepareSessionStore(SESSIONS_PATH, sessionSecret);
+const sessionCodec = createSessionCodec(sessionSecret, sessionStorePreparation.encryptionSalt);
 if (sessionStorePreparation.removedSessions > 0) {
     console.warn(`Removed ${sessionStorePreparation.removedSessions} incompatible session file(s). Users must sign in again.`);
 }
@@ -67,7 +69,10 @@ const sessionParser = session({
         factor: 1,
         minTimeout: 50,
         maxTimeout: 100,
-        secret: sessionSecret,
+        // The custom codec retains authenticated encryption without deriving
+        // the same secret again on every file-store read/touch/write.
+        encoder: sessionCodec.encoder,
+        decoder: sessionCodec.decoder,
         logFn: function(){}
     }),
     name: 'panel.sid',
